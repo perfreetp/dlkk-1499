@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
@@ -21,14 +21,6 @@ import { cn } from '@/utils/helpers';
 import { useApplicationStore } from '@/store/application';
 import StepProgress from '@/components/Steps/StepProgress';
 
-const conditionItems = [
-  { id: '1', label: '新生儿已在本市助产机构出生', required: true },
-  { id: '2', label: '父母一方为本市户籍', required: true },
-  { id: '3', label: '父母双方均持有有效身份证件', required: true },
-  { id: '4', label: '已为新生儿起好正式姓名', required: true },
-  { id: '5', label: '父母婚姻关系存续（单亲家庭无需）', required: false },
-];
-
 const materialSteps = [
   { id: '1', label: '条件自检' },
   { id: '2', label: '材料清单' },
@@ -38,13 +30,34 @@ const materialSteps = [
 export default function Materials() {
   const navigate = useNavigate();
   const { materials, setMaterialUploaded, divergenceResult } = useApplicationStore();
+
+  const isRemote = divergenceResult?.settlementType === 'remote';
+  const isSingle = divergenceResult?.maritalStatus === 'single';
+
+  const conditionItems = useMemo(() => {
+    const items = [
+      { id: '1', label: '新生儿已在本市助产机构出生', required: true },
+    ];
+    if (!isRemote) {
+      items.push({ id: '2', label: '父母一方为本市户籍', required: true });
+    }
+    items.push({ id: '3', label: '父母双方均持有有效身份证件', required: true });
+    items.push({ id: '4', label: '已为新生儿起好正式姓名', required: true });
+    if (!isSingle) {
+      items.push({ id: '5', label: '父母婚姻关系存续', required: true });
+    } else {
+      items.push({ id: '5', label: '已准备非婚生育情况说明（单亲家庭）', required: false });
+    }
+    return items;
+  }, [isRemote, isSingle]);
+
   const [currentStep, setCurrentStep] = useState(0);
-  const [conditions, setConditions] = useState<Record<string, boolean>>({
-    '1': true,
-    '2': true,
-    '3': true,
-    '4': true,
-    '5': false,
+  const [conditions, setConditions] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    conditionItems.forEach((item) => {
+      initial[item.id] = item.required;
+    });
+    return initial;
   });
   const [expandedCategory, setExpandedCategory] = useState<string | null>('身份证明');
 
@@ -72,22 +85,32 @@ export default function Materials() {
     .filter((m) => m.required)
     .every((m) => m.uploaded);
 
-  const canProceedToApply = currentStep === 2 && allRequiredUploaded;
+  if (!divergenceResult) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 mb-4">请先在首页完成智能分流选择</p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
+          >
+            返回首页
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
-      {/* 页面标题 */}
       <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-8">
         <div className="container mx-auto px-4">
           <h1 className="text-2xl md:text-3xl font-bold mb-2">材料准备</h1>
-          <p className="text-blue-100">
-            {divergenceResult?.pathName || '本市户籍已婚家庭联办路径'}
-          </p>
+          <p className="text-blue-100">{divergenceResult.pathName}</p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* 步骤导航 */}
         <div className="max-w-4xl mx-auto mb-8">
           <div className="bg-white rounded-2xl shadow-sm p-6">
             <StepProgress steps={materialSteps} currentStep={currentStep} />
@@ -95,7 +118,6 @@ export default function Materials() {
         </div>
 
         <div className="max-w-4xl mx-auto">
-          {/* 步骤1：条件自检 */}
           {currentStep === 0 && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-6 py-4 border-b border-blue-100">
@@ -105,9 +127,7 @@ export default function Materials() {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-gray-900">申报条件自检</h2>
-                    <p className="text-sm text-gray-600">
-                      请确认您是否符合以下申报条件
-                    </p>
+                    <p className="text-sm text-gray-600">请确认您是否符合以下申报条件</p>
                   </div>
                 </div>
               </div>
@@ -128,14 +148,10 @@ export default function Materials() {
                     <div
                       className={cn(
                         'w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0',
-                        conditions[item.id]
-                          ? 'bg-blue-500'
-                          : 'border-2 border-gray-300'
+                        conditions[item.id] ? 'bg-blue-500' : 'border-2 border-gray-300'
                       )}
                     >
-                      {conditions[item.id] && (
-                        <Check className="w-4 h-4 text-white" />
-                      )}
+                      {conditions[item.id] && <Check className="w-4 h-4 text-white" />}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -143,6 +159,11 @@ export default function Materials() {
                         {item.required && (
                           <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded">
                             必填
+                          </span>
+                        )}
+                        {!item.required && (
+                          <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 text-xs font-medium rounded">
+                            选填
                           </span>
                         )}
                       </div>
@@ -156,7 +177,6 @@ export default function Materials() {
                 ))}
               </div>
 
-              {/* 进度提示 */}
               <div className="px-6 pb-6">
                 <div className="bg-gray-50 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -168,23 +188,18 @@ export default function Materials() {
                   <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(checkedCount / conditionItems.length) * 100}%`,
-                      }}
+                      style={{ width: `${(checkedCount / conditionItems.length) * 100}%` }}
                     />
                   </div>
                   {!allRequiredChecked && (
                     <div className="mt-3 flex items-start gap-2 text-amber-600">
                       <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm">
-                        请确认所有必填条件，否则可能影响后续办理
-                      </p>
+                      <p className="text-sm">请确认所有必填条件，否则可能影响后续办理</p>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* 操作按钮 */}
               <div className="px-6 pb-6 flex gap-3">
                 <button
                   onClick={() => navigate('/')}
@@ -210,7 +225,6 @@ export default function Materials() {
             </div>
           )}
 
-          {/* 步骤2：材料清单 */}
           {currentStep === 1 && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-6 py-4 border-b border-blue-100">
@@ -221,7 +235,7 @@ export default function Materials() {
                   <div>
                     <h2 className="text-lg font-bold text-gray-900">材料清单</h2>
                     <p className="text-sm text-gray-600">
-                      根据您的情况，以下是需要准备的材料
+                      根据您的情况（{divergenceResult.pathName}），以下是需要准备的材料
                     </p>
                   </div>
                 </div>
@@ -229,76 +243,45 @@ export default function Materials() {
 
               <div className="p-6 space-y-4">
                 {Object.entries(groupedMaterials).map(([category, items]) => (
-                  <div
-                    key={category}
-                    className="border border-gray-200 rounded-xl overflow-hidden"
-                  >
+                  <div key={category} className="border border-gray-200 rounded-xl overflow-hidden">
                     <button
-                      onClick={() =>
-                        setExpandedCategory(
-                          expandedCategory === category ? null : category
-                        )
-                      }
+                      onClick={() => setExpandedCategory(expandedCategory === category ? null : category)}
                       className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-2">
                         <FileText className="w-5 h-5 text-blue-500" />
-                        <span className="font-semibold text-gray-900">
-                          {category}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          ({items.length}份)
-                        </span>
+                        <span className="font-semibold text-gray-900">{category}</span>
+                        <span className="text-sm text-gray-500">({items.length}份)</span>
                       </div>
                       <ChevronRight
-                        className={cn(
-                          'w-5 h-5 text-gray-400 transition-transform',
-                          expandedCategory === category && 'rotate-90'
-                        )}
+                        className={cn('w-5 h-5 text-gray-400 transition-transform', expandedCategory === category && 'rotate-90')}
                       />
                     </button>
                     {expandedCategory === category && (
                       <div className="p-4 space-y-3">
                         {items.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg"
-                          >
+                          <div key={item.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                             <div
                               className={cn(
                                 'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
-                                item.uploaded
-                                  ? 'bg-green-500'
-                                  : 'border-2 border-gray-300'
+                                item.uploaded ? 'bg-green-500' : 'border-2 border-gray-300'
                               )}
                             >
-                              {item.uploaded && (
-                                <Check className="w-3 h-3 text-white" />
-                              )}
+                              {item.uploaded && <Check className="w-3 h-3 text-white" />}
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium text-gray-900">
-                                  {item.name}
-                                </span>
+                                <span className="font-medium text-gray-900">{item.name}</span>
                                 {item.required ? (
-                                  <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded">
-                                    必需
-                                  </span>
+                                  <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded">必需</span>
                                 ) : (
-                                  <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 text-xs font-medium rounded">
-                                    可选
-                                  </span>
+                                  <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 text-xs font-medium rounded">可选</span>
                                 )}
                                 {item.id === '4' && (
-                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs font-medium rounded">
-                                    已联网
-                                  </span>
+                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs font-medium rounded">已联网</span>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-500 mt-1">
-                                {item.description}
-                              </p>
+                              <p className="text-sm text-gray-500 mt-1">{item.description}</p>
                             </div>
                           </div>
                         ))}
@@ -308,7 +291,6 @@ export default function Materials() {
                 ))}
               </div>
 
-              {/* 材料统计 */}
               <div className="px-6 pb-6">
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
                   <div className="flex items-center justify-between">
@@ -317,25 +299,20 @@ export default function Materials() {
                         <FileCheck className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">
-                          共 {materials.length} 份材料
-                        </p>
+                        <p className="font-semibold text-gray-900">共 {materials.length} 份材料</p>
                         <p className="text-sm text-gray-600">
                           必需 {requiredCountMat} 份，可选 {materials.length - requiredCountMat} 份
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-blue-600">
-                        {uploadedCount}/{materials.length}
-                      </p>
+                      <p className="text-2xl font-bold text-blue-600">{uploadedCount}/{materials.length}</p>
                       <p className="text-sm text-gray-500">已准备</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* 操作按钮 */}
               <div className="px-6 pb-6 flex gap-3">
                 <button
                   onClick={() => setCurrentStep(0)}
@@ -354,14 +331,10 @@ export default function Materials() {
             </div>
           )}
 
-          {/* 步骤3：材料上传 */}
           {currentStep === 2 && (
             <div className="space-y-6">
               {Object.entries(groupedMaterials).map(([category, items]) => (
-                <div
-                  key={category}
-                  className="bg-white rounded-2xl shadow-sm overflow-hidden"
-                >
+                <div key={category} className="bg-white rounded-2xl shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
                     <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                       <FileText className="w-5 h-5 text-blue-500" />
@@ -385,9 +358,7 @@ export default function Materials() {
                               <ImageIcon className="w-8 h-8 text-green-500" />
                             </div>
                             <div className="flex-1">
-                              <p className="font-medium text-gray-900">
-                                {item.name}
-                              </p>
+                              <p className="font-medium text-gray-900">{item.name}</p>
                               <p className="text-sm text-green-600 flex items-center gap-1">
                                 <CheckCircle2 className="w-4 h-4" />
                                 已上传
@@ -410,12 +381,8 @@ export default function Materials() {
                                 <Upload className="w-8 h-8 text-gray-400" />
                               </div>
                               <div className="flex-1">
-                                <p className="font-medium text-gray-900">
-                                  {item.name}
-                                </p>
-                                <p className="text-sm text-gray-500">
-                                  点击上传或拖拽文件
-                                </p>
+                                <p className="font-medium text-gray-900">{item.name}</p>
+                                <p className="text-sm text-gray-500">点击上传或拖拽文件</p>
                               </div>
                               <Plus className="w-5 h-5 text-gray-400" />
                             </div>
@@ -424,9 +391,7 @@ export default function Materials() {
                         {item.id === '4' && (
                           <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-blue-100/50 rounded-lg">
                             <Shield className="w-4 h-4 text-blue-600" />
-                            <span className="text-xs text-blue-700">
-                              医院已联网推送，无需重复提交
-                            </span>
+                            <span className="text-xs text-blue-700">医院已联网推送，无需重复提交</span>
                           </div>
                         )}
                       </div>
@@ -435,7 +400,6 @@ export default function Materials() {
                 </div>
               ))}
 
-              {/* 提示信息 */}
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
                 <Info className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
                 <div className="text-sm text-amber-800">
@@ -443,12 +407,11 @@ export default function Materials() {
                   <ul className="space-y-1 list-disc list-inside">
                     <li>支持 JPG、PNG、PDF 格式，单文件不超过 10MB</li>
                     <li>请确保照片清晰，文字可辨识</li>
-                    <li>身份证需上传正反面，户口本需上传首页和本人页</li>
+                    <li>身份证需上传正反面{!isRemote && '，户口本需上传首页和本人页'}</li>
                   </ul>
                 </div>
               </div>
 
-              {/* 操作按钮 */}
               <div className="bg-white rounded-2xl shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
@@ -472,9 +435,7 @@ export default function Materials() {
                 <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-4">
                   <div
                     className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${(uploadedCount / requiredCountMat) * 100}%`,
-                    }}
+                    style={{ width: requiredCountMat > 0 ? `${(uploadedCount / requiredCountMat) * 100}%` : '0%' }}
                   />
                 </div>
                 <div className="flex gap-3">

@@ -73,35 +73,37 @@ const services = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const { setDivergenceResult } = useApplicationStore();
+  const { setDivergenceResult, divergenceResult } = useApplicationStore();
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>(null);
   const [settlementType, setSettlementType] = useState<SettlementType>(null);
   const [showDivergenceResult, setShowDivergenceResult] = useState(false);
 
   const canProceed = maritalStatus && settlementType;
 
+  const getPathName = () => {
+    if (maritalStatus === 'married' && settlementType === 'local') return '本市户籍已婚家庭联办路径';
+    if (maritalStatus === 'single' && settlementType === 'local') return '本市户籍单亲家庭联办路径';
+    if (maritalStatus === 'married' && settlementType === 'remote') return '外省市户籍已婚家庭联办路径';
+    if (maritalStatus === 'single' && settlementType === 'remote') return '外省市户籍单亲家庭联办路径';
+    return '标准联办路径';
+  };
+
+  const getApplicableItems = () => {
+    if (settlementType === 'local') {
+      return ['出生医学证明', '户口登记', '城乡居民医保', '社会保障卡', '预防接种'];
+    }
+    return ['出生医学证明', '预防接种'];
+  };
+
   const handleStartApplication = () => {
     if (!canProceed) return;
 
-    const pathName =
-      maritalStatus === 'married' && settlementType === 'local'
-        ? '本市户籍已婚家庭联办路径'
-        : maritalStatus === 'single' && settlementType === 'local'
-        ? '本市户籍单亲家庭联办路径'
-        : settlementType === 'remote'
-        ? '外省市户籍联办路径'
-        : '标准联办路径';
-
-    const applicableItems =
-      settlementType === 'local'
-        ? ['出生医学证明', '户口登记', '城乡居民医保', '社会保障卡', '预防接种']
-        : ['出生医学证明', '预防接种'];
-
     setDivergenceResult({
       maritalStatus: maritalStatus || 'married',
+      settlementType: settlementType || 'local',
       settlementLocation: settlementType === 'local' ? '本市户籍' : '外省市户籍',
-      applicableItems,
-      pathName,
+      applicableItems: getApplicableItems(),
+      pathName: getPathName(),
     });
 
     setShowDivergenceResult(true);
@@ -336,7 +338,7 @@ export default function Home() {
                 </div>
 
                 {/* 分流结果 */}
-                {showDivergenceResult && (
+                {showDivergenceResult && divergenceResult && (
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -347,34 +349,17 @@ export default function Home() {
                           为您匹配的办理路径
                         </h5>
                         <p className="text-emerald-700 font-medium mb-2">
-                          {settlementType === 'local'
-                            ? '本市户籍已婚家庭联办路径'
-                            : '外省市户籍联办路径'}
+                          {divergenceResult.pathName}
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {settlementType === 'local'
-                            ? [
-                                '出生医学证明',
-                                '户口登记',
-                                '城乡居民医保',
-                                '社会保障卡',
-                                '预防接种',
-                              ].map((item) => (
-                                <span
-                                  key={item}
-                                  className="px-2 py-1 bg-white text-emerald-600 text-xs font-medium rounded-lg border border-emerald-200"
-                                >
-                                  {item}
-                                </span>
-                              ))
-                            : ['出生医学证明', '预防接种'].map((item) => (
-                                <span
-                                  key={item}
-                                  className="px-2 py-1 bg-white text-emerald-600 text-xs font-medium rounded-lg border border-emerald-200"
-                                >
-                                  {item}
-                                </span>
-                              ))}
+                          {divergenceResult.applicableItems.map((item) => (
+                            <span
+                              key={item}
+                              className="px-2 py-1 bg-white text-emerald-600 text-xs font-medium rounded-lg border border-emerald-200"
+                            >
+                              {item}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     </div>

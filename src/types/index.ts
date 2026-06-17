@@ -72,6 +72,7 @@ export interface FAQ {
 
 export interface DivergenceResult {
   maritalStatus: 'married' | 'single' | 'divorced';
+  settlementType: 'local' | 'remote';
   settlementLocation: string;
   applicableItems: string[];
   pathName: string;
