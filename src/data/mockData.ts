@@ -89,6 +89,7 @@ export const mockMaterials: MaterialItem[] = [
     description: '需提供正反面照片，确保信息清晰可辨',
     uploaded: true,
     category: '身份证明',
+    source: 'electronic',
   },
   {
     id: '2',
@@ -97,6 +98,7 @@ export const mockMaterials: MaterialItem[] = [
     description: '需提供结婚证照片，如为单亲家庭可免',
     uploaded: true,
     category: '婚姻证明',
+    source: 'electronic',
   },
   {
     id: '3',
@@ -105,6 +107,7 @@ export const mockMaterials: MaterialItem[] = [
     description: '需提供落户方户口本首页及本人页',
     uploaded: false,
     category: '户籍证明',
+    source: 'manual',
   },
   {
     id: '4',
@@ -113,6 +116,7 @@ export const mockMaterials: MaterialItem[] = [
     description: '医院已联网推送，无需重复提交',
     uploaded: false,
     category: '出生证明',
+    source: 'electronic',
   },
   {
     id: '5',
@@ -121,6 +125,7 @@ export const mockMaterials: MaterialItem[] = [
     description: '如落户地为自有住房需提供',
     uploaded: false,
     category: '房产证明',
+    source: 'manual',
   },
 ];
 
@@ -209,11 +214,10 @@ export function generateMaterials(
       id: '1',
       name: maritalStatus === 'single' ? '母亲身份证' : '父母双方身份证',
       required: true,
-      description: maritalStatus === 'single'
-        ? '需提供母亲身份证正反面照片，确保信息清晰可辨'
-        : '需提供正反面照片，确保信息清晰可辨',
+      description: '电子证照已自动调取，无需手动上传',
       uploaded: true,
       category: '身份证明',
+      source: 'electronic',
     },
   ];
 
@@ -222,18 +226,20 @@ export function generateMaterials(
       id: '2',
       name: '结婚证',
       required: true,
-      description: '需提供结婚证照片',
+      description: '电子证照已自动调取，无需手动上传',
       uploaded: true,
       category: '婚姻证明',
+      source: 'electronic',
     });
   } else {
     base.push({
       id: '2',
       name: '非婚生育说明',
       required: true,
-      description: '需提供本人签署的非婚生育情况说明',
+      description: '需本人签署并上传扫描件',
       uploaded: false,
       category: '婚姻证明',
+      source: 'manual',
     });
   }
 
@@ -242,9 +248,20 @@ export function generateMaterials(
       id: '3',
       name: '户口本',
       required: true,
-      description: '需提供落户方户口本首页及本人页',
+      description: '需提供落户方户口本首页及本人页照片',
       uploaded: false,
       category: '户籍证明',
+      source: 'manual',
+    });
+  } else {
+    base.push({
+      id: '3',
+      name: '户口本（本市）',
+      required: false,
+      description: '外省市户籍暂不需要本市户口本',
+      uploaded: false,
+      category: '户籍证明',
+      source: 'notApplicable',
     });
   }
 
@@ -255,6 +272,7 @@ export function generateMaterials(
     description: '医院已联网推送，无需重复提交',
     uploaded: false,
     category: '出生证明',
+    source: 'electronic',
   });
 
   if (settlementType === 'local') {
@@ -265,6 +283,17 @@ export function generateMaterials(
       description: '如落户地为自有住房需提供',
       uploaded: false,
       category: '房产证明',
+      source: 'manual',
+    });
+  } else {
+    base.push({
+      id: '5',
+      name: '房产证/购房合同',
+      required: false,
+      description: '外省市户籍暂不需要本市房产证明',
+      uploaded: false,
+      category: '房产证明',
+      source: 'notApplicable',
     });
   }
 
@@ -288,7 +317,7 @@ export function generateApplicationItems(
       id: '2',
       name: '户口登记',
       department: '公安局',
-      status: 'processing',
+      status: 'rejected',
       estimatedTime: '3个工作日',
       order: 2,
     },
@@ -296,7 +325,7 @@ export function generateApplicationItems(
       id: '3',
       name: '城乡居民医保参保',
       department: '医疗保障局',
-      status: 'pending',
+      status: 'rejected',
       estimatedTime: '2个工作日',
       order: 3,
     },

@@ -62,6 +62,7 @@ export default function Progress() {
   const completedCount = applicationItems.filter((item) => item.status === 'completed').length;
   const processingCount = applicationItems.filter((item) => item.status === 'processing').length;
   const pendingCount = applicationItems.filter((item) => item.status === 'pending').length;
+  const rejectedCount = applicationItems.filter((item) => item.status === 'rejected').length;
   const totalProgress = applicationItems.length > 0 ? Math.round((completedCount / applicationItems.length) * 100) : 0;
 
   const unresolvedCorrections = corrections.filter((c) => !c.resolved);
@@ -121,10 +122,13 @@ export default function Progress() {
                   <div className="h-full bg-white rounded-full transition-all duration-1000" style={{ width: `${totalProgress}%` }} />
                 </div>
               </div>
-              <div className="mt-4 flex items-center gap-4 text-sm text-blue-100">
+              <div className="mt-4 flex items-center gap-4 text-sm text-blue-100 flex-wrap">
                 <span className="flex items-center gap-1"><CheckCircle2 className="w-4 h-4" />已完成 {completedCount}</span>
                 <span className="flex items-center gap-1"><Clock className="w-4 h-4" />办理中 {processingCount}</span>
                 <span className="flex items-center gap-1"><Clock className="w-4 h-4" />待办理 {pendingCount}</span>
+                {rejectedCount > 0 && (
+                  <span className="flex items-center gap-1 text-red-200"><AlertCircle className="w-4 h-4" />待补正 {rejectedCount}</span>
+                )}
               </div>
             </div>
 

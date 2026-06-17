@@ -23,6 +23,7 @@ import {
   IdCard,
   Signature,
   FileText,
+  Zap,
 } from 'lucide-react';
 import { cn, maskIdCard, maskPhone } from '@/utils/helpers';
 import { useApplicationStore } from '@/store/application';
@@ -557,85 +558,171 @@ export default function Apply() {
             <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="bg-gradient-to-r from-emerald-50 to-teal-50 px-6 py-4 border-b border-emerald-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
-                      <FileCheck className="w-5 h-5 text-white" />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
+                        <FileCheck className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-900">提交前核对</h2>
+                        <p className="text-sm text-gray-600">请仔细核对以下信息，确认无误后提交</p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-gray-900">提交确认</h2>
-                      <p className="text-sm text-gray-600">请确认申报信息无误后提交</p>
-                    </div>
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-medium rounded-full">
+                      {applicationItems.length} 项联办
+                    </span>
                   </div>
                 </div>
 
                 <div className="p-6 space-y-6">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">申报信息摘要</h3>
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">办理路径</span>
-                        <span className="font-medium text-gray-900">{divergenceResult.pathName}</span>
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                        <Zap className="w-5 h-5 text-white" />
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">联办事项</span>
-                        <span className="font-medium text-gray-900">{applicationItems.length} 项</span>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-500">办理路径</p>
+                        <p className="font-bold text-gray-900">{divergenceResult.pathName}</p>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">事项明细</span>
-                        <span className="font-medium text-gray-900">
-                          {applicationItems.map((i) => i.name).join('、')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">新生儿姓名</span>
-                        <span className="font-medium text-gray-900">{babyInfo.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">提交材料</span>
-                        <span className="font-medium text-gray-900">{materials.length} 份</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">办理顺序</span>
-                        <span className="font-medium text-gray-900">
-                          {applicationItems.map((i) => `第${i.order}步:${i.name}`).join(' → ')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">预计办结</span>
-                        <span className="font-medium text-emerald-600">7-10 个工作日</span>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500">申请人</p>
+                        <p className="font-medium text-gray-900">{babyInfo.name}</p>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">电子签名确认</h3>
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center">
-                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Signature className="w-8 h-8 text-blue-500" />
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3">父母双方已完成身份核验，电子签名已生成</p>
-                      <div className="flex items-center justify-center gap-4 text-sm">
-                        <span className="px-3 py-1 bg-green-100 text-green-600 rounded-full">{fatherInfo.name} 已签名</span>
-                        <span className="px-3 py-1 bg-green-100 text-green-600 rounded-full">{motherInfo.name} 已签名</span>
+                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <ClipboardList className="w-5 h-5 text-blue-500" />
+                      联办事项及办理顺序
+                    </h3>
+                    <div className="relative">
+                      <div className="absolute left-5 top-3 bottom-3 w-0.5 bg-gray-200" />
+                      <div className="space-y-2">
+                        {applicationItems.map((item, index) => {
+                          const iconConfig = getItemIcon(item.name);
+                          const IconComp = iconConfig.icon;
+                          const isLast = index === applicationItems.length - 1;
+                          return (
+                            <div key={item.id} className="relative flex items-center gap-4 pl-2">
+                              <div className="relative z-10 w-8 h-8 bg-gradient-to-br rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm"
+                                style={{ background: `linear-gradient(135deg, #3b82f6, #06b6d4)` }}
+                              >
+                                {item.order}
+                              </div>
+                              <div className="flex-1 flex items-center gap-3 py-2">
+                                <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center', iconConfig.color)}>
+                                  <IconComp className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900">{item.name}</p>
+                                  <p className="text-xs text-gray-500">{item.department}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-500">预计</p>
+                                <p className="font-medium text-gray-700">{item.estimatedTime}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
 
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={agreed}
-                      onChange={(e) => setAgreed(e.target.checked)}
-                      className="mt-1 w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-600">
-                      我已阅读并同意
-                      <a href="#" className="text-blue-600 hover:underline">《"出生一件事"联办服务协议》</a>
-                      、
-                      <a href="#" className="text-blue-600 hover:underline">《个人信息处理告知书》</a>
-                      ，确认所填信息真实有效，同意相关部门共享核查我的信息用于办理上述事项。
-                    </span>
-                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">提交材料</p>
+                          <p className="text-2xl font-bold text-gray-900">{materials.filter((m) => m.source !== 'notApplicable').length} 份</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">电子证照</span>
+                          <span className="text-emerald-600 font-medium">
+                            {materials.filter((m) => m.source === 'electronic').length} 份
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">需上传</span>
+                          <span className="text-amber-600 font-medium">
+                            {materials.filter((m) => m.source === 'manual').length} 份
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">暂不适用</span>
+                          <span className="text-gray-400 font-medium">
+                            {materials.filter((m) => m.source === 'notApplicable').length} 份
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                          <Clock className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">预计总耗时</p>
+                          <p className="text-2xl font-bold text-gray-900">7-10 天</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">最快办结</span>
+                          <span className="text-emerald-600 font-medium">5 个工作日</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">平均办结</span>
+                          <span className="text-emerald-600 font-medium">7 个工作日</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">承诺时限</span>
+                          <span className="text-gray-600 font-medium">10 个工作日</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-3">监护人信息</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                        <p className="text-sm text-gray-500 mb-1">父亲</p>
+                        <p className="font-medium text-gray-900">{fatherInfo.name}</p>
+                        <p className="text-xs text-gray-500">{maskIdCard(fatherInfo.idCard)}</p>
+                      </div>
+                      <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                        <p className="text-sm text-gray-500 mb-1">母亲</p>
+                        <p className="font-medium text-gray-900">{motherInfo.name}</p>
+                        <p className="text-xs text-gray-500">{maskIdCard(motherInfo.idCard)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={agreed}
+                        onChange={(e) => setAgreed(e.target.checked)}
+                        className="mt-0.5 w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-600 leading-relaxed">
+                        我已阅读并同意
+                        <a href="#" className="text-blue-600 hover:underline">《"出生一件事"联办服务协议》</a>
+                        、
+                        <a href="#" className="text-blue-600 hover:underline">《个人信息处理告知书》</a>
+                        ，确认所填信息真实有效，同意相关部门共享核查我的信息用于办理上述事项。
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -650,9 +737,9 @@ export default function Apply() {
                   onClick={handleSubmit}
                   disabled={!agreed || submitting}
                   className={cn(
-                    'flex-1 py-3 font-medium rounded-xl transition-all flex items-center justify-center gap-2',
+                    'flex-1 py-3.5 font-semibold rounded-xl transition-all flex items-center justify-center gap-2',
                     agreed && !submitting
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600 shadow-lg hover:shadow-xl'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   )}
                 >

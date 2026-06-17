@@ -16,16 +16,37 @@ import {
   FileText,
   Shield,
   ArrowRight,
+  Download,
+  Ban,
 } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { useApplicationStore } from '@/store/application';
 import StepProgress from '@/components/Steps/StepProgress';
+import type { MaterialSource } from '@/types';
 
 const materialSteps = [
   { id: '1', label: '条件自检' },
   { id: '2', label: '材料清单' },
   { id: '3', label: '材料上传' },
 ];
+
+const sourceLabels: Record<MaterialSource, { label: string; className: string; icon: typeof Download }> = {
+  electronic: {
+    label: '电子证照已调取',
+    className: 'bg-emerald-100 text-emerald-600',
+    icon: Download,
+  },
+  manual: {
+    label: '需手动上传',
+    className: 'bg-amber-100 text-amber-600',
+    icon: Upload,
+  },
+  notApplicable: {
+    label: '暂不适用',
+    className: 'bg-gray-200 text-gray-500',
+    icon: Ban,
+  },
+};
 
 export default function Materials() {
   const navigate = useNavigate();
@@ -79,11 +100,16 @@ export default function Materials() {
     return acc;
   }, {} as Record<string, typeof materials>);
 
-  const uploadedCount = materials.filter((m) => m.uploaded).length;
-  const requiredCountMat = materials.filter((m) => m.required).length;
-  const allRequiredUploaded = materials
+  const validMaterials = materials.filter((m) => m.source !== 'notApplicable');
+  const uploadedCount = validMaterials.filter((m) => m.uploaded).length;
+  const requiredCountMat = validMaterials.filter((m) => m.required).length;
+  const allRequiredUploaded = validMaterials
     .filter((m) => m.required)
     .every((m) => m.uploaded);
+
+  const electronicCount = materials.filter((m) => m.source === 'electronic').length;
+  const manualCount = materials.filter((m) => m.source === 'manual').length;
+  const notApplicableCount = materials.filter((m) => m.source === 'notApplicable').length;
 
   if (!divergenceResult) {
     return (
@@ -228,15 +254,30 @@ export default function Materials() {
           {currentStep === 1 && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
               <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-6 py-4 border-b border-blue-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
-                    <ClipboardList className="w-5 h-5 text-white" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                      <ClipboardList className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-gray-900">材料清单</h2>
+                      <p className="text-sm text-gray-600">
+                        共 {validMaterials.length} 份有效材料
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-900">材料清单</h2>
-                    <p className="text-sm text-gray-600">
-                      根据您的情况（{divergenceResult.pathName}），以下是需要准备的材料
-                    </p>
+                  <div className="hidden md:flex gap-2">
+                    {Object.entries(sourceLabels).map(([key, cfg]) => (
+                      <span
+                        key={key}
+                        className={cn('px-2.5 py-1 text-xs font-medium rounded-full', cfg.className)}
+                      >
+                        {cfg.label}
+                        {key === 'electronic' && ` ${electronicCount}份`}
+                        {key === 'manual' && ` ${manualCount}份`}
+                        {key === 'notApplicable' && ` ${notApplicableCount}份`}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -259,32 +300,63 @@ export default function Materials() {
                     </button>
                     {expandedCategory === category && (
                       <div className="p-4 space-y-3">
-                        {items.map((item) => (
-                          <div key={item.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        {items.map((item) => {
+                          const sourceCfg = sourceLabels[item.source];
+                          const SourceIcon = sourceCfg.icon;
+                          return (
                             <div
+                              key={item.id}
                               className={cn(
-                                'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
-                                item.uploaded ? 'bg-green-500' : 'border-2 border-gray-300'
+                                'flex items-start gap-3 p-3 rounded-lg',
+                                item.source === 'notApplicable'
+                                  ? 'bg-gray-100 opacity-60'
+                                  : 'bg-gray-50'
                               )}
                             >
-                              {item.uploaded && <Check className="w-3 h-3 text-white" />}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-gray-900">{item.name}</span>
-                                {item.required ? (
-                                  <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded">必需</span>
-                                ) : (
-                                  <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 text-xs font-medium rounded">可选</span>
+                              <div
+                                className={cn(
+                                  'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
+                                  item.uploaded
+                                    ? 'bg-green-500'
+                                    : item.source === 'notApplicable'
+                                      ? 'bg-gray-300'
+                                      : 'border-2 border-gray-300'
                                 )}
-                                {item.id === '4' && (
-                                  <span className="px-1.5 py-0.5 bg-green-100 text-green-600 text-xs font-medium rounded">已联网</span>
-                                )}
+                              >
+                                {item.uploaded && <Check className="w-3 h-3 text-white" />}
                               </div>
-                              <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span
+                                    className={cn(
+                                      'font-medium',
+                                      item.source === 'notApplicable'
+                                        ? 'text-gray-500 line-through'
+                                        : 'text-gray-900'
+                                    )}
+                                  >
+                                    {item.name}
+                                  </span>
+                                  {item.required ? (
+                                    <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs font-medium rounded">必需</span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 bg-gray-200 text-gray-600 text-xs font-medium rounded">可选</span>
+                                  )}
+                                  <span
+                                    className={cn(
+                                      'px-2 py-0.5 text-xs font-medium rounded flex items-center gap-1',
+                                      sourceCfg.className
+                                    )}
+                                  >
+                                    <SourceIcon className="w-3 h-3" />
+                                    {sourceCfg.label}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -293,22 +365,36 @@ export default function Materials() {
 
               <div className="px-6 pb-6">
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                        <FileCheck className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">共 {materials.length} 份材料</p>
-                        <p className="text-sm text-gray-600">
-                          必需 {requiredCountMat} 份，可选 {materials.length - requiredCountMat} 份
-                        </p>
-                      </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center p-2">
+                      <div className="text-2xl font-bold text-emerald-600">{electronicCount}</div>
+                      <p className="text-xs text-gray-600 mt-1">电子证照已调取</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-blue-600">{uploadedCount}/{materials.length}</p>
-                      <p className="text-sm text-gray-500">已准备</p>
+                    <div className="text-center p-2 border-x border-blue-200">
+                      <div className="text-2xl font-bold text-amber-600">{manualCount}</div>
+                      <p className="text-xs text-gray-600 mt-1">需手动上传</p>
                     </div>
+                    <div className="text-center p-2">
+                      <div className="text-2xl font-bold text-gray-400">{notApplicableCount}</div>
+                      <p className="text-xs text-gray-600 mt-1">暂不适用</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-blue-200 flex items-center justify-between">
+                    <p className="text-sm text-gray-700">
+                      必需材料 <span className="font-bold text-gray-900">{requiredCountMat}</span> 份，已准备{' '}
+                      <span className="font-bold text-green-600">{uploadedCount}</span> 份
+                    </p>
+                    {allRequiredUploaded ? (
+                      <span className="text-sm text-green-600 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" />
+                        材料齐全
+                      </span>
+                    ) : (
+                      <span className="text-sm text-amber-600 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-4 h-4" />
+                        还需补充
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -333,72 +419,109 @@ export default function Materials() {
 
           {currentStep === 2 && (
             <div className="space-y-6">
-              {Object.entries(groupedMaterials).map(([category, items]) => (
-                <div key={category} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                    <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-blue-500" />
-                      {category}
-                    </h3>
-                  </div>
-                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {items.map((item) => (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          'border-2 border-dashed rounded-xl p-4 transition-all',
-                          item.uploaded
-                            ? 'border-green-300 bg-green-50'
-                            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-                        )}
-                      >
-                        {item.uploaded ? (
-                          <div className="flex items-center gap-3">
-                            <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center border border-green-200">
-                              <ImageIcon className="w-8 h-8 text-green-500" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900">{item.name}</p>
-                              <p className="text-sm text-green-600 flex items-center gap-1">
-                                <CheckCircle2 className="w-4 h-4" />
-                                已上传
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => setMaterialUploaded(item.id, false)}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setMaterialUploaded(item.id, true)}
-                            className="w-full text-left"
+              {Object.entries(groupedMaterials).map(([category, items]) => {
+                const uploadableItems = items.filter((i) => i.source !== 'notApplicable');
+                if (uploadableItems.length === 0) return null;
+
+                return (
+                  <div key={category} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+                      <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                        <FileText className="w-5 h-5 text-blue-500" />
+                        {category}
+                      </h3>
+                    </div>
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {uploadableItems.map((item) => {
+                        const sourceCfg = sourceLabels[item.source];
+                        const SourceIcon = sourceCfg.icon;
+                        return (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              'border-2 border-dashed rounded-xl p-4 transition-all',
+                              item.uploaded
+                                ? 'border-green-300 bg-green-50'
+                                : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+                            )}
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                                <Upload className="w-8 h-8 text-gray-400" />
+                            {item.uploaded ? (
+                              <div className="flex items-center gap-3">
+                                <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center border border-green-200">
+                                  <ImageIcon className="w-8 h-8 text-green-500" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-gray-900">{item.name}</p>
+                                  <p className="text-sm text-green-600 flex items-center gap-1">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    已上传
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setMaterialUploaded(item.id, false)}
+                                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
                               </div>
-                              <div className="flex-1">
-                                <p className="font-medium text-gray-900">{item.name}</p>
-                                <p className="text-sm text-gray-500">点击上传或拖拽文件</p>
-                              </div>
-                              <Plus className="w-5 h-5 text-gray-400" />
+                            ) : (
+                              <button
+                                onClick={() => setMaterialUploaded(item.id, true)}
+                                className="w-full text-left"
+                                disabled={item.source === 'electronic'}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    {item.source === 'electronic' ? (
+                                      <Shield className="w-8 h-8 text-emerald-500" />
+                                    ) : (
+                                      <Upload className="w-8 h-8 text-gray-400" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="font-medium text-gray-900">{item.name}</p>
+                                    <p className="text-sm text-gray-500">
+                                      {item.source === 'electronic'
+                                        ? '电子证照已自动调取'
+                                        : '点击上传或拖拽文件'}
+                                    </p>
+                                  </div>
+                                  {item.source === 'electronic' ? (
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                                  ) : (
+                                    <Plus className="w-5 h-5 text-gray-400" />
+                                  )}
+                                </div>
+                              </button>
+                            )}
+                            <div
+                              className={cn(
+                                'mt-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium',
+                                sourceCfg.className
+                              )}
+                            >
+                              <SourceIcon className="w-3.5 h-3.5" />
+                              {sourceCfg.label}
                             </div>
-                          </button>
-                        )}
-                        {item.id === '4' && (
-                          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-blue-100/50 rounded-lg">
-                            <Shield className="w-4 h-4 text-blue-600" />
-                            <span className="text-xs text-blue-700">医院已联网推送，无需重复提交</span>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {notApplicableCount > 0 && (
+                <div className="bg-gray-100 border border-gray-200 rounded-xl p-4 flex items-start gap-3">
+                  <Ban className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-gray-600">
+                    <p className="font-medium text-gray-700 mb-1">
+                      有 {notApplicableCount} 份材料暂不适用
+                    </p>
+                    <p>根据您当前的办理路径，户口本和本市房产证明等材料暂不需要。如后续变更落户地，可重新选择路径。</p>
                   </div>
                 </div>
-              ))}
+              )}
 
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
                 <Info className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -417,7 +540,7 @@ export default function Materials() {
                   <div>
                     <p className="font-medium text-gray-900">材料上传进度</p>
                     <p className="text-sm text-gray-500">
-                      必需材料 {uploadedCount}/{requiredCountMat} 份已上传
+                      必需材料 {uploadedCount}/{requiredCountMat} 份已准备
                     </p>
                   </div>
                   {allRequiredUploaded ? (

@@ -31,6 +31,8 @@ export interface ApplicationItem {
   order: number;
 }
 
+export type MaterialSource = 'electronic' | 'manual' | 'notApplicable';
+
 export interface MaterialItem {
   id: string;
   name: string;
@@ -39,6 +41,7 @@ export interface MaterialItem {
   uploaded: boolean;
   uploadUrl?: string;
   category: string;
+  source: MaterialSource;
 }
 
 export interface CorrectionNotice {

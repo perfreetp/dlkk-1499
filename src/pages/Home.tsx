@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -27,7 +27,7 @@ import { cn } from '@/utils/helpers';
 import { useApplicationStore } from '@/store/application';
 import { faqData } from '@/data/faqData';
 
-type MaritalStatus = 'married' | 'single' | null;
+type MaritalStatus = 'married' | 'single' | 'divorced' | null;
 type SettlementType = 'local' | 'remote' | null;
 
 const processSteps = [
@@ -74,9 +74,12 @@ const services = [
 export default function Home() {
   const navigate = useNavigate();
   const { setDivergenceResult, divergenceResult } = useApplicationStore();
-  const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>(null);
-  const [settlementType, setSettlementType] = useState<SettlementType>(null);
-  const [showDivergenceResult, setShowDivergenceResult] = useState(false);
+  const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>(
+    divergenceResult?.maritalStatus || null
+  );
+  const [settlementType, setSettlementType] = useState<SettlementType>(
+    divergenceResult?.settlementType || null
+  );
 
   const canProceed = maritalStatus && settlementType;
 
@@ -95,19 +98,17 @@ export default function Home() {
     return ['出生医学证明', '预防接种'];
   };
 
-  const handleStartApplication = () => {
-    if (!canProceed) return;
-
-    setDivergenceResult({
-      maritalStatus: maritalStatus || 'married',
-      settlementType: settlementType || 'local',
-      settlementLocation: settlementType === 'local' ? '本市户籍' : '外省市户籍',
-      applicableItems: getApplicableItems(),
-      pathName: getPathName(),
-    });
-
-    setShowDivergenceResult(true);
-  };
+  useEffect(() => {
+    if (maritalStatus && settlementType) {
+      setDivergenceResult({
+        maritalStatus,
+        settlementType,
+        settlementLocation: settlementType === 'local' ? '本市户籍' : '外省市户籍',
+        applicableItems: getApplicableItems(),
+        pathName: getPathName(),
+      });
+    }
+  }, [maritalStatus, settlementType]);
 
   const handleGoToMaterials = () => {
     navigate('/materials');
@@ -338,7 +339,7 @@ export default function Home() {
                 </div>
 
                 {/* 分流结果 */}
-                {showDivergenceResult && divergenceResult && (
+                {canProceed && divergenceResult && (
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -361,6 +362,9 @@ export default function Home() {
                             </span>
                           ))}
                         </div>
+                        <p className="text-xs text-emerald-600 mt-3">
+                          共 {divergenceResult.applicableItems.length} 个联办事项，可随时修改上方选项重新匹配
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -368,9 +372,7 @@ export default function Home() {
 
                 {/* 开始按钮 */}
                 <button
-                  onClick={
-                    showDivergenceResult ? handleGoToMaterials : handleStartApplication
-                  }
+                  onClick={handleGoToMaterials}
                   disabled={!canProceed}
                   className={cn(
                     'w-full py-4 rounded-2xl font-semibold text-lg transition-all',
@@ -380,14 +382,14 @@ export default function Home() {
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   )}
                 >
-                  {showDivergenceResult ? (
+                  {canProceed ? (
                     <>
                       开始准备材料
                       <ArrowRight className="w-5 h-5" />
                     </>
                   ) : (
                     <>
-                      查看我的办理路径
+                      请先选择您的情况
                       <ChevronRight className="w-5 h-5" />
                     </>
                   )}
