@@ -21,8 +21,10 @@ import {
   Upload,
   Check,
   X,
+  ChevronDown,
+  Building,
 } from 'lucide-react';
-import { cn, getStatusText, getStatusColor, formatDate } from '@/utils/helpers';
+import { cn, getStatusText, getStatusColor, formatDate, formatDateTime, flowRecordIconMap, flowRecordColorMap } from '@/utils/helpers';
 import { useProgressStore } from '@/store/progress';
 import { useApplicationStore } from '@/store/application';
 
@@ -58,6 +60,7 @@ export default function Progress() {
   const [activeCorrectionId, setActiveCorrectionId] = useState<string | null>(null);
   const [uploadingCorrection, setUploadingCorrection] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
 
   const completedCount = applicationItems.filter((item) => item.status === 'completed').length;
   const processingCount = applicationItems.filter((item) => item.status === 'processing').length;
@@ -90,6 +93,18 @@ export default function Progress() {
       setActiveCorrectionId(null);
       setResolvedIds((prev) => new Set(prev).add(correctionId));
     }, 1500);
+  };
+
+  const toggleExpand = (itemId: string) => {
+    setExpandedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
   };
 
   return (
@@ -326,6 +341,8 @@ export default function Progress() {
                     const StatusIcon = statusIcons[item.status].icon;
                     const ServiceIcon = serviceIcons[item.name] || FileText;
                     const isLast = index === filteredItems.length - 1;
+                    const isExpanded = expandedItemIds.has(item.id);
+                    const hasFlowRecords = item.flowRecords && item.flowRecords.length > 0;
 
                     return (
                       <div key={item.id} className="relative flex gap-4">
@@ -350,98 +367,182 @@ export default function Progress() {
 
                         <div className="flex-1 pb-6">
                           <div className={cn(
-                            'bg-gray-50 rounded-xl p-4 border transition-all hover:shadow-sm',
+                            'bg-gray-50 rounded-xl border transition-all hover:shadow-sm overflow-hidden',
                             item.status === 'processing' && 'border-blue-200 bg-blue-50',
                             item.status === 'rejected' && 'border-red-200 bg-red-50'
                           )}>
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                                <p className="text-sm text-gray-500">{item.department}</p>
-                              </div>
-                              <span className={cn(
-                                'px-2.5 py-1 text-xs font-medium rounded-full flex items-center gap-1',
-                                getStatusColor(item.status)
-                              )}>
-                                <StatusIcon className="w-3.5 h-3.5" />
-                                {getStatusText(item.status)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-4 text-sm text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
-                                预计 {item.estimatedTime}
-                              </span>
-                              {item.actualTime && (
-                                <span className="flex items-center gap-1">
-                                  <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                  实际用时 {item.actualTime}
+                            <div className="p-4">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <h3 className="font-semibold text-gray-900">{item.name}</h3>
+                                  <p className="text-sm text-gray-500">{item.department}</p>
+                                </div>
+                                <span className={cn(
+                                  'px-2.5 py-1 text-xs font-medium rounded-full flex items-center gap-1',
+                                  getStatusColor(item.status)
+                                )}>
+                                  <StatusIcon className="w-3.5 h-3.5" />
+                                  {getStatusText(item.status)}
                                 </span>
+                              </div>
+
+                              <div className="flex items-center gap-4 text-sm text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  预计 {item.estimatedTime}
+                                </span>
+                                {item.actualTime && (
+                                  <span className="flex items-center gap-1">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    实际用时 {item.actualTime}
+                                  </span>
+                                )}
+                              </div>
+
+                              {item.remarks && (
+                                <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
+                                  <p className="text-sm text-gray-600">{item.remarks}</p>
+                                </div>
+                              )}
+
+                              {item.status === 'processing' && (
+                                <div className="mt-3">
+                                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                                    <span>办理进度</span>
+                                    <span>60%</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-blue-500 rounded-full w-3/5" />
+                                  </div>
+                                </div>
+                              )}
+
+                              {item.status === 'rejected' && (() => {
+                                const relatedCorrection = unresolvedCorrections.find((c) => c.itemId === item.id);
+                                if (relatedCorrection && activeCorrectionId !== relatedCorrection.id) {
+                                  return (
+                                    <button
+                                      onClick={() => handleStartCorrection(relatedCorrection.id)}
+                                      className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                                    >
+                                      查看补正要求并处理
+                                      <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                  );
+                                }
+                                if (relatedCorrection && activeCorrectionId === relatedCorrection.id) {
+                                  return (
+                                    <div className="mt-3 border-2 border-dashed border-red-300 rounded-xl p-4 bg-red-50">
+                                      <p className="text-sm text-red-700 font-medium mb-1">补正要求</p>
+                                      <p className="text-sm text-gray-600 mb-3">{relatedCorrection.content}</p>
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={() => handleSimulateUpload(relatedCorrection.id)}
+                                          disabled={uploadingCorrection === relatedCorrection.id}
+                                          className={cn(
+                                            'flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1',
+                                            uploadingCorrection === relatedCorrection.id
+                                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                              : 'bg-blue-500 text-white hover:bg-blue-600'
+                                          )}
+                                        >
+                                          {uploadingCorrection === relatedCorrection.id ? '上传中...' : '上传补正材料'}
+                                        </button>
+                                        <button
+                                          onClick={handleCancelCorrection}
+                                          className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                        >
+                                          取消
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              })()}
+
+                              {hasFlowRecords && (
+                                <button
+                                  onClick={() => toggleExpand(item.id)}
+                                  className={cn(
+                                    'mt-4 w-full flex items-center justify-between py-2 px-3 rounded-lg',
+                                    'text-sm text-gray-600 hover:text-gray-900 hover:bg-white transition-colors'
+                                  )}
+                                >
+                                  <span className="flex items-center gap-1.5">
+                                    <Clock className="w-4 h-4" />
+                                    查看流转记录（{item.flowRecords.length} 条）
+                                  </span>
+                                  <ChevronDown className={cn(
+                                    'w-4 h-4 transition-transform',
+                                    isExpanded && 'rotate-180'
+                                  )} />
+                                </button>
                               )}
                             </div>
 
-                            {item.remarks && (
-                              <div className="mt-3 p-3 bg-white rounded-lg border border-gray-100">
-                                <p className="text-sm text-gray-600">{item.remarks}</p>
-                              </div>
-                            )}
+                            {isExpanded && hasFlowRecords && (
+                              <div className="border-t border-gray-200 bg-white px-4 py-4">
+                                <div className="relative pl-8">
+                                  <div className="absolute left-2.5 top-1 bottom-1 w-0.5 bg-gray-200" />
+                                  <div className="space-y-5">
+                                    {item.flowRecords.map((record, rIndex) => {
+                                      const RecordIcon = flowRecordIconMap[record.type];
+                                      const colorCfg = flowRecordColorMap[record.type];
+                                      const isLastRecord = rIndex === item.flowRecords.length - 1;
+                                      const isHighlighted = record.type === 'rejected' || record.type === 'corrected';
 
-                            {item.status === 'processing' && (
-                              <div className="mt-3">
-                                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                                  <span>办理进度</span>
-                                  <span>60%</span>
-                                </div>
-                                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                  <div className="h-full bg-blue-500 rounded-full w-3/5" />
-                                </div>
-                              </div>
-                            )}
-
-                            {item.status === 'rejected' && (() => {
-                              const relatedCorrection = unresolvedCorrections.find((c) => c.itemId === item.id);
-                              if (relatedCorrection && activeCorrectionId !== relatedCorrection.id) {
-                                return (
-                                  <button
-                                    onClick={() => handleStartCorrection(relatedCorrection.id)}
-                                    className="mt-3 text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
-                                  >
-                                    查看补正要求并处理
-                                    <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                );
-                              }
-                              if (relatedCorrection && activeCorrectionId === relatedCorrection.id) {
-                                return (
-                                  <div className="mt-3 border-2 border-dashed border-red-300 rounded-xl p-4 bg-red-50">
-                                    <p className="text-sm text-red-700 font-medium mb-1">补正要求</p>
-                                    <p className="text-sm text-gray-600 mb-3">{relatedCorrection.content}</p>
-                                    <div className="flex gap-2">
-                                      <button
-                                        onClick={() => handleSimulateUpload(relatedCorrection.id)}
-                                        disabled={uploadingCorrection === relatedCorrection.id}
-                                        className={cn(
-                                          'flex-1 py-2 text-sm font-medium rounded-lg flex items-center justify-center gap-1',
-                                          uploadingCorrection === relatedCorrection.id
-                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                            : 'bg-blue-500 text-white hover:bg-blue-600'
-                                        )}
-                                      >
-                                        {uploadingCorrection === relatedCorrection.id ? '上传中...' : '上传补正材料'}
-                                      </button>
-                                      <button
-                                        onClick={handleCancelCorrection}
-                                        className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                      >
-                                        取消
-                                      </button>
-                                    </div>
+                                      return (
+                                        <div key={record.id} className="relative">
+                                          <div className={cn(
+                                            'absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center z-10',
+                                            colorCfg.dot
+                                          )}>
+                                            <RecordIcon className="w-3 h-3 text-white" />
+                                          </div>
+                                          {!isLastRecord && (
+                                            <div
+                                              className={cn(
+                                                'absolute -left-[21px] top-5 w-0.5',
+                                                colorCfg.line
+                                              )}
+                                              style={{ height: 'calc(100% + 0.5rem)' }}
+                                            />
+                                          )}
+                                          <div className={cn(
+                                            'rounded-lg p-3',
+                                            isHighlighted ? colorCfg.bg : 'bg-gray-50'
+                                          )}>
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex-1">
+                                                <p className={cn('text-sm font-semibold', colorCfg.text)}>
+                                                  {record.title}
+                                                </p>
+                                                {record.remark && (
+                                                  <p className="text-sm text-gray-600 mt-1">
+                                                    {record.remark}
+                                                  </p>
+                                                )}
+                                                <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 flex-wrap">
+                                                  <span className="flex items-center gap-1">
+                                                    <Building className="w-3.5 h-3.5" />
+                                                    {record.department}
+                                                  </span>
+                                                  <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3.5 h-3.5" />
+                                                    {formatDateTime(record.time)}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              }
-                              return null;
-                            })()}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

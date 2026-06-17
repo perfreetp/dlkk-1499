@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ClipboardList,
@@ -7,7 +7,6 @@ import {
   Shield,
   CheckCircle2,
   AlertCircle,
-  ChevronRight,
   ArrowRight,
   Check,
   X,
@@ -24,6 +23,7 @@ import {
   Signature,
   FileText,
   Zap,
+  Save,
 } from 'lucide-react';
 import { cn, maskIdCard, maskPhone } from '@/utils/helpers';
 import { useApplicationStore } from '@/store/application';
@@ -61,18 +61,37 @@ export default function Apply() {
     setFatherInfo,
     setMotherInfo,
     setApplicationSubmitted,
+    applyStep,
+    setApplyStep,
+    verifiedFather,
+    verifiedMother,
+    setVerifiedFather,
+    setVerifiedMother,
+    saveDraft,
+    setCurrentStep,
   } = useApplicationStore();
   const { applicationItems } = useProgressStore();
 
-  const [currentStep, setCurrentStep] = useState(0);
+  const currentStep = applyStep;
+  const isSingle = divergenceResult?.maritalStatus === 'single';
+
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [verifiedFather, setVerifiedFather] = useState(false);
-  const [verifiedMother, setVerifiedMother] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const allVerified = verifiedFather && verifiedMother;
+  useEffect(() => {
+    setCurrentStep('apply');
+    saveDraft();
+  }, [setCurrentStep, saveDraft]);
+
+  // 单亲时父亲默认识别为通过（不要求）
+  const allVerified = isSingle ? verifiedMother : verifiedFather && verifiedMother;
+
+  const handleNextStep = (next: number) => {
+    setApplyStep(next);
+    setTimeout(saveDraft, 0);
+  };
 
   const handleEdit = (field: string, value: string) => {
     setEditingField(field);
@@ -93,11 +112,22 @@ export default function Apply() {
     }
     setEditingField(null);
     setEditValue('');
+    setTimeout(saveDraft, 0);
   };
 
   const handleCancelEdit = () => {
     setEditingField(null);
     setEditValue('');
+  };
+
+  const handleVerifyFather = () => {
+    setVerifiedFather(true);
+    setTimeout(saveDraft, 0);
+  };
+
+  const handleVerifyMother = () => {
+    setVerifiedMother(true);
+    setTimeout(saveDraft, 0);
   };
 
   const handleSubmit = () => {
@@ -173,6 +203,11 @@ export default function Apply() {
     );
   }
 
+  const electronicCount = materials.filter((m) => m.source === 'electronic').length;
+  const manualCount = materials.filter((m) => m.source === 'manual').length;
+  const notApplicableCount = materials.filter((m) => m.source === 'notApplicable').length;
+  const validMaterialCount = materials.filter((m) => m.source !== 'notApplicable').length;
+
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
       <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-8">
@@ -225,6 +260,10 @@ export default function Apply() {
                   </div>
                 );
               })}
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2 text-sm text-gray-500">
+              <Save className="w-4 h-4" />
+              <span>已自动保存草稿</span>
             </div>
           </div>
         </div>
@@ -300,7 +339,7 @@ export default function Apply() {
                   返回材料准备
                 </button>
                 <button
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => handleNextStep(1)}
                   className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all flex items-center justify-center gap-2"
                 >
                   确认并继续
@@ -343,47 +382,74 @@ export default function Apply() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-900">父亲信息</h2>
-                        <p className="text-sm text-gray-600">监护人一方</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <InfoRow label="姓名" value={fatherInfo.name} field="father.name" />
-                    <InfoRow label="身份证号" value={fatherInfo.idCard} field="father.idCard" masked />
-                    <InfoRow label="手机号码" value={maskPhone(fatherInfo.phone)} field="father.phone" />
-                    <InfoRow label="关系" value="父亲" field="father.relation" editable={false} />
-                  </div>
-                </div>
-
+              {isSingle ? (
                 <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                   <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-purple-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                          <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold text-gray-900">监护人信息（母亲）</h2>
+                          <p className="text-sm text-gray-600">单亲家庭仅需核验母亲身份</p>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-900">母亲信息</h2>
-                        <p className="text-sm text-gray-600">监护人一方</p>
-                      </div>
+                      <span className="px-3 py-1 bg-purple-100 text-purple-600 text-xs font-medium rounded-full">
+                        单亲路径
+                      </span>
                     </div>
                   </div>
-                  <div className="p-6">
+                  <div className="p-6 grid md:grid-cols-2 gap-x-8">
                     <InfoRow label="姓名" value={motherInfo.name} field="mother.name" />
                     <InfoRow label="身份证号" value={motherInfo.idCard} field="mother.idCard" masked />
                     <InfoRow label="手机号码" value={maskPhone(motherInfo.phone)} field="mother.phone" />
-                    <InfoRow label="关系" value="母亲" field="mother.relation" editable={false} />
+                    <InfoRow label="关系" value="母亲（监护人）" field="mother.relation" editable={false} />
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                          <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold text-gray-900">父亲信息</h2>
+                          <p className="text-sm text-gray-600">监护人一方</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <InfoRow label="姓名" value={fatherInfo.name} field="father.name" />
+                      <InfoRow label="身份证号" value={fatherInfo.idCard} field="father.idCard" masked />
+                      <InfoRow label="手机号码" value={maskPhone(fatherInfo.phone)} field="father.phone" />
+                      <InfoRow label="关系" value="父亲" field="father.relation" editable={false} />
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 px-6 py-4 border-b border-purple-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                          <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold text-gray-900">母亲信息</h2>
+                          <p className="text-sm text-gray-600">监护人一方</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <InfoRow label="姓名" value={motherInfo.name} field="mother.name" />
+                      <InfoRow label="身份证号" value={motherInfo.idCard} field="mother.idCard" masked />
+                      <InfoRow label="手机号码" value={maskPhone(motherInfo.phone)} field="mother.phone" />
+                      <InfoRow label="关系" value="母亲" field="mother.relation" editable={false} />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
                 <Eye className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -399,13 +465,13 @@ export default function Apply() {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setCurrentStep(0)}
+                  onClick={() => handleNextStep(0)}
                   className="flex-1 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   上一步
                 </button>
                 <button
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => handleNextStep(2)}
                   className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all flex items-center justify-center gap-2"
                 >
                   信息确认无误
@@ -425,52 +491,56 @@ export default function Apply() {
                     </div>
                     <div>
                       <h2 className="text-lg font-bold text-gray-900">监护人身份核验</h2>
-                      <p className="text-sm text-gray-600">为保障您的信息安全，请完成身份核验</p>
+                      <p className="text-sm text-gray-600">
+                        {isSingle ? '单亲家庭，需完成母亲身份核验' : '为保障您的信息安全，请完成双方身份核验'}
+                      </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className={cn('border-2 rounded-2xl p-6 transition-all', verifiedFather ? 'border-green-300 bg-green-50' : 'border-gray-200')}>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-                          <User className="w-6 h-6 text-white" />
+                  <div className={cn('grid gap-6', isSingle ? 'md:grid-cols-1 max-w-xl mx-auto' : 'md:grid-cols-2')}>
+                    {!isSingle && (
+                      <div className={cn('border-2 rounded-2xl p-6 transition-all', verifiedFather ? 'border-green-300 bg-green-50' : 'border-gray-200')}>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                            <User className="w-6 h-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-gray-900">{fatherInfo.name}（父亲）</h3>
+                            <p className="text-sm text-gray-500">{maskIdCard(fatherInfo.idCard)}</p>
+                          </div>
+                          {verifiedFather && <CheckCircle2 className="w-6 h-6 text-green-500 ml-auto" />}
                         </div>
-                        <div>
-                          <h3 className="font-bold text-gray-900">{fatherInfo.name}（父亲）</h3>
-                          <p className="text-sm text-gray-500">{maskIdCard(fatherInfo.idCard)}</p>
-                        </div>
-                        {verifiedFather && <CheckCircle2 className="w-6 h-6 text-green-500 ml-auto" />}
+                        {verifiedFather ? (
+                          <div className="text-center py-4">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                              <CheckCircle2 className="w-8 h-8 text-green-500" />
+                            </div>
+                            <p className="text-green-600 font-medium">身份核验通过</p>
+                            <p className="text-sm text-gray-500 mt-1">人脸比对成功，身份已确认</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <IdCard className="w-4 h-4" />
+                              <span>身份证信息已核验</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Signature className="w-4 h-4" />
+                              <span>电子签名待确认</span>
+                            </div>
+                            <button
+                              onClick={handleVerifyFather}
+                              className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                            >
+                              <Shield className="w-5 h-5" />
+                              开始人脸识别核验
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      {verifiedFather ? (
-                        <div className="text-center py-4">
-                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                            <CheckCircle2 className="w-8 h-8 text-green-500" />
-                          </div>
-                          <p className="text-green-600 font-medium">身份核验通过</p>
-                          <p className="text-sm text-gray-500 mt-1">人脸比对成功，身份已确认</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <IdCard className="w-4 h-4" />
-                            <span>身份证信息已核验</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Signature className="w-4 h-4" />
-                            <span>电子签名待确认</span>
-                          </div>
-                          <button
-                            onClick={() => setVerifiedFather(true)}
-                            className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Shield className="w-5 h-5" />
-                            开始人脸识别核验
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                    )}
 
                     <div className={cn('border-2 rounded-2xl p-6 transition-all', verifiedMother ? 'border-green-300 bg-green-50' : 'border-gray-200')}>
                       <div className="flex items-center gap-3 mb-4">
@@ -478,7 +548,9 @@ export default function Apply() {
                           <User className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-gray-900">{motherInfo.name}（母亲）</h3>
+                          <h3 className="font-bold text-gray-900">
+                            {motherInfo.name}（母亲）{isSingle && ' · 监护人'}
+                          </h3>
                           <p className="text-sm text-gray-500">{maskIdCard(motherInfo.idCard)}</p>
                         </div>
                         {verifiedMother && <CheckCircle2 className="w-6 h-6 text-green-500 ml-auto" />}
@@ -502,7 +574,7 @@ export default function Apply() {
                             <span>电子签名待确认</span>
                           </div>
                           <button
-                            onClick={() => setVerifiedMother(true)}
+                            onClick={handleVerifyMother}
                             className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                           >
                             <Shield className="w-5 h-5" />
@@ -512,6 +584,18 @@ export default function Apply() {
                       )}
                     </div>
                   </div>
+
+                  {isSingle && (
+                    <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-purple-500 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm text-purple-800">
+                          <p className="font-medium">单亲家庭说明</p>
+                          <p>您选择了单亲家庭办理路径，本次仅核验母亲身份即可完成申报。如后续需要补充父亲信息，可在结果领取前联系人工窗口办理。</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="mt-6 p-4 bg-gray-50 rounded-xl">
                     <div className="flex items-start gap-3">
@@ -532,13 +616,13 @@ export default function Apply() {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => handleNextStep(1)}
                   className="flex-1 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   上一步
                 </button>
                 <button
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => handleNextStep(3)}
                   disabled={!allVerified}
                   className={cn(
                     'flex-1 py-3 font-medium rounded-xl transition-all flex items-center justify-center gap-2',
@@ -599,14 +683,14 @@ export default function Apply() {
                     <div className="relative">
                       <div className="absolute left-5 top-3 bottom-3 w-0.5 bg-gray-200" />
                       <div className="space-y-2">
-                        {applicationItems.map((item, index) => {
+                        {applicationItems.map((item) => {
                           const iconConfig = getItemIcon(item.name);
                           const IconComp = iconConfig.icon;
-                          const isLast = index === applicationItems.length - 1;
                           return (
                             <div key={item.id} className="relative flex items-center gap-4 pl-2">
-                              <div className="relative z-10 w-8 h-8 bg-gradient-to-br rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm"
-                                style={{ background: `linear-gradient(135deg, #3b82f6, #06b6d4)` }}
+                              <div
+                                className="relative z-10 w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm"
+                                style={{ background: 'linear-gradient(135deg, #3b82f6, #06b6d4)' }}
                               >
                                 {item.order}
                               </div>
@@ -638,27 +722,21 @@ export default function Apply() {
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">提交材料</p>
-                          <p className="text-2xl font-bold text-gray-900">{materials.filter((m) => m.source !== 'notApplicable').length} 份</p>
+                          <p className="text-2xl font-bold text-gray-900">{validMaterialCount} 份</p>
                         </div>
                       </div>
                       <div className="mt-3 space-y-1 text-xs">
                         <div className="flex justify-between">
                           <span className="text-gray-500">电子证照</span>
-                          <span className="text-emerald-600 font-medium">
-                            {materials.filter((m) => m.source === 'electronic').length} 份
-                          </span>
+                          <span className="text-emerald-600 font-medium">{electronicCount} 份</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">需上传</span>
-                          <span className="text-amber-600 font-medium">
-                            {materials.filter((m) => m.source === 'manual').length} 份
-                          </span>
+                          <span className="text-amber-600 font-medium">{manualCount} 份</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">暂不适用</span>
-                          <span className="text-gray-400 font-medium">
-                            {materials.filter((m) => m.source === 'notApplicable').length} 份
-                          </span>
+                          <span className="text-gray-400 font-medium">{notApplicableCount} 份</span>
                         </div>
                       </div>
                     </div>
@@ -691,19 +769,29 @@ export default function Apply() {
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">监护人信息</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
-                        <p className="text-sm text-gray-500 mb-1">父亲</p>
-                        <p className="font-medium text-gray-900">{fatherInfo.name}</p>
-                        <p className="text-xs text-gray-500">{maskIdCard(fatherInfo.idCard)}</p>
-                      </div>
+                    <h3 className="font-semibold text-gray-900 mb-3">
+                      {isSingle ? '监护人信息（母亲）' : '监护人信息'}
+                    </h3>
+                    {isSingle ? (
                       <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
-                        <p className="text-sm text-gray-500 mb-1">母亲</p>
+                        <p className="text-sm text-gray-500 mb-1">母亲（监护人）</p>
                         <p className="font-medium text-gray-900">{motherInfo.name}</p>
                         <p className="text-xs text-gray-500">{maskIdCard(motherInfo.idCard)}</p>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                          <p className="text-sm text-gray-500 mb-1">父亲</p>
+                          <p className="font-medium text-gray-900">{fatherInfo.name}</p>
+                          <p className="text-xs text-gray-500">{maskIdCard(fatherInfo.idCard)}</p>
+                        </div>
+                        <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+                          <p className="text-sm text-gray-500 mb-1">母亲</p>
+                          <p className="font-medium text-gray-900">{motherInfo.name}</p>
+                          <p className="text-xs text-gray-500">{maskIdCard(motherInfo.idCard)}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-4 border-t border-gray-100">
@@ -728,7 +816,7 @@ export default function Apply() {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => handleNextStep(2)}
                   className="flex-1 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   上一步

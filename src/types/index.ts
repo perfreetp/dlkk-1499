@@ -20,6 +20,23 @@ export interface BabyInfo {
 
 export type ApplicationStatus = 'pending' | 'processing' | 'completed' | 'rejected';
 
+export type FlowRecordType =
+  | 'accepted'
+  | 'reviewing'
+  | 'rejected'
+  | 'corrected'
+  | 'processing'
+  | 'completed';
+
+export interface FlowRecord {
+  id: string;
+  type: FlowRecordType;
+  title: string;
+  department: string;
+  time: string;
+  remark?: string;
+}
+
 export interface ApplicationItem {
   id: string;
   name: string;
@@ -29,6 +46,7 @@ export interface ApplicationItem {
   actualTime?: string;
   remarks?: string;
   order: number;
+  flowRecords: FlowRecord[];
 }
 
 export type MaterialSource = 'electronic' | 'manual' | 'notApplicable';
@@ -90,3 +108,17 @@ export const stepLabels: Record<PageStep, string> = {
   progress: '进度中心',
   result: '结果领取',
 };
+
+export interface DraftData {
+  divergenceResult: DivergenceResult;
+  materials: MaterialItem[];
+  materialsStep: number;
+  applyStep: number;
+  verifiedFather: boolean;
+  verifiedMother: boolean;
+  babyInfo: BabyInfo;
+  fatherInfo: UserInfo;
+  motherInfo: UserInfo;
+  lastPage: PageStep;
+  updatedAt: string;
+}

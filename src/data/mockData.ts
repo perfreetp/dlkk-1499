@@ -6,6 +6,8 @@ import type {
   CorrectionNotice,
   ECertificate,
   DivergenceResult,
+  FlowRecord,
+  ApplicationStatus,
 } from '@/types';
 
 export const mockBabyInfo: BabyInfo = {
@@ -45,6 +47,7 @@ export const mockApplicationItems: ApplicationItem[] = [
     estimatedTime: '1个工作日',
     actualTime: '0.5个工作日',
     order: 1,
+    flowRecords: generateFlowRecords('1', '出生医学证明信息确认', '卫生健康委员会', 'completed'),
   },
   {
     id: '2',
@@ -53,6 +56,7 @@ export const mockApplicationItems: ApplicationItem[] = [
     status: 'processing',
     estimatedTime: '3个工作日',
     order: 2,
+    flowRecords: generateFlowRecords('2', '户口登记', '公安局', 'processing'),
   },
   {
     id: '3',
@@ -61,6 +65,7 @@ export const mockApplicationItems: ApplicationItem[] = [
     status: 'pending',
     estimatedTime: '2个工作日',
     order: 3,
+    flowRecords: generateFlowRecords('3', '城乡居民医保参保', '医疗保障局', 'pending'),
   },
   {
     id: '4',
@@ -69,6 +74,7 @@ export const mockApplicationItems: ApplicationItem[] = [
     status: 'pending',
     estimatedTime: '5个工作日',
     order: 4,
+    flowRecords: generateFlowRecords('4', '社会保障卡申领', '人力资源和社会保障局', 'pending'),
   },
   {
     id: '5',
@@ -78,6 +84,7 @@ export const mockApplicationItems: ApplicationItem[] = [
     estimatedTime: '1个工作日',
     actualTime: '1个工作日',
     order: 5,
+    flowRecords: generateFlowRecords('5', '预防接种信息建档', '疾病预防控制中心', 'completed'),
   },
 ];
 
@@ -300,6 +307,74 @@ export function generateMaterials(
   return base;
 }
 
+export function generateFlowRecords(
+  itemId: string,
+  itemName: string,
+  department: string,
+  status: ApplicationStatus
+): FlowRecord[] {
+  const baseRecords: FlowRecord[] = [
+    {
+      id: `${itemId}-1`,
+      type: 'accepted',
+      title: '事项已受理',
+      department,
+      time: '2024-06-15 10:30',
+    },
+    {
+      id: `${itemId}-2`,
+      type: 'reviewing',
+      title: '部门材料审核中',
+      department,
+      time: '2024-06-15 14:20',
+    },
+  ];
+
+  if (status === 'rejected') {
+    baseRecords.push({
+      id: `${itemId}-3`,
+      type: 'rejected',
+      title: '材料需补正',
+      department,
+      time: '2024-06-16 09:15',
+      remark: itemId === '2'
+        ? '户口本首页照片模糊，请重新上传清晰的扫描件或照片'
+        : '请确认新生儿姓名与出生医学证明一致',
+    });
+  }
+
+  if (status === 'processing') {
+    baseRecords.push({
+      id: `${itemId}-3`,
+      type: 'processing',
+      title: '正在办理',
+      department,
+      time: '2024-06-16 11:00',
+    });
+  }
+
+  if (status === 'completed') {
+    baseRecords.push(
+      {
+        id: `${itemId}-3`,
+        type: 'processing',
+        title: '正在办理',
+        department,
+        time: '2024-06-15 16:40',
+      },
+      {
+        id: `${itemId}-4`,
+        type: 'completed',
+        title: '办结完成',
+        department,
+        time: '2024-06-16 15:30',
+      }
+    );
+  }
+
+  return baseRecords;
+}
+
 export function generateApplicationItems(
   applicableItems: string[]
 ): ApplicationItem[] {
@@ -312,6 +387,7 @@ export function generateApplicationItems(
       estimatedTime: '1个工作日',
       actualTime: '0.5个工作日',
       order: 1,
+      flowRecords: generateFlowRecords('1', '出生医学证明信息确认', '卫生健康委员会', 'completed'),
     },
     {
       id: '2',
@@ -320,6 +396,7 @@ export function generateApplicationItems(
       status: 'rejected',
       estimatedTime: '3个工作日',
       order: 2,
+      flowRecords: generateFlowRecords('2', '户口登记', '公安局', 'rejected'),
     },
     {
       id: '3',
@@ -328,6 +405,7 @@ export function generateApplicationItems(
       status: 'rejected',
       estimatedTime: '2个工作日',
       order: 3,
+      flowRecords: generateFlowRecords('3', '城乡居民医保参保', '医疗保障局', 'rejected'),
     },
     {
       id: '4',
@@ -336,6 +414,7 @@ export function generateApplicationItems(
       status: 'pending',
       estimatedTime: '5个工作日',
       order: 4,
+      flowRecords: generateFlowRecords('4', '社会保障卡申领', '人力资源和社会保障局', 'pending'),
     },
     {
       id: '5',
@@ -345,6 +424,7 @@ export function generateApplicationItems(
       estimatedTime: '1个工作日',
       actualTime: '1个工作日',
       order: 5,
+      flowRecords: generateFlowRecords('5', '预防接种信息建档', '疾病预防控制中心', 'completed'),
     },
   ];
 

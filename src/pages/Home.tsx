@@ -22,10 +22,17 @@ import {
   Syringe,
   ArrowRight,
   Sparkles,
+  FileText,
+  Save,
+  AlertTriangle,
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { useApplicationStore } from '@/store/application';
 import { faqData } from '@/data/faqData';
+import { stepLabels } from '@/types';
+import type { DraftData } from '@/types';
 
 type MaritalStatus = 'married' | 'single' | 'divorced' | null;
 type SettlementType = 'local' | 'remote' | null;
@@ -71,48 +78,155 @@ const services = [
   { icon: Syringe, title: '预防接种建档', desc: '疾控部门办理', color: 'bg-purple-100 text-purple-600' },
 ];
 
+function formatDraftTime(iso: string) {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return `${mins} 分钟前`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} 小时前`;
+    const days = Math.floor(hrs / 24);
+    return `${days} 天前`;
+  } catch {
+    return '最近';
+  }
+}
+
 export default function Home() {
   const navigate = useNavigate();
-  const { setDivergenceResult, divergenceResult } = useApplicationStore();
+  const {
+    setDivergenceResult,
+    divergenceResult,
+    loadDraft,
+    hasDraft,
+    clearDraft,
+    saveDraft,
+  } = useApplicationStore();
+
   const [maritalStatus, setMaritalStatus] = useState<MaritalStatus>(
     divergenceResult?.maritalStatus || null
   );
   const [settlementType, setSettlementType] = useState<SettlementType>(
     divergenceResult?.settlementType || null
   );
+  const [draft, setDraft] = useState<DraftData | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<{
+    marital: MaritalStatus;
+    settlement: SettlementType;
+  } | null>(null);
+
+  // 页面加载时读取草稿信息
+  useEffect(() => {
+    if (hasDraft()) {
+      const raw = localStorage.getItem('birth-one-thing-draft');
+      if (raw) {
+        try {
+          setDraft(JSON.parse(raw));
+        } catch {
+          setDraft(null);
+        }
+      }
+    }
+  }, [hasDraft]);
 
   const canProceed = maritalStatus && settlementType;
 
-  const getPathName = () => {
-    if (maritalStatus === 'married' && settlementType === 'local') return '本市户籍已婚家庭联办路径';
-    if (maritalStatus === 'single' && settlementType === 'local') return '本市户籍单亲家庭联办路径';
-    if (maritalStatus === 'married' && settlementType === 'remote') return '外省市户籍已婚家庭联办路径';
-    if (maritalStatus === 'single' && settlementType === 'remote') return '外省市户籍单亲家庭联办路径';
+  const getPathName = (ms: MaritalStatus, st: SettlementType) => {
+    if (ms === 'married' && st === 'local') return '本市户籍已婚家庭联办路径';
+    if (ms === 'single' && st === 'local') return '本市户籍单亲家庭联办路径';
+    if (ms === 'married' && st === 'remote') return '外省市户籍已婚家庭联办路径';
+    if (ms === 'single' && st === 'remote') return '外省市户籍单亲家庭联办路径';
     return '标准联办路径';
   };
 
-  const getApplicableItems = () => {
-    if (settlementType === 'local') {
+  const getApplicableItems = (st: SettlementType) => {
+    if (st === 'local') {
       return ['出生医学证明', '户口登记', '城乡居民医保', '社会保障卡', '预防接种'];
     }
     return ['出生医学证明', '预防接种'];
   };
 
-  useEffect(() => {
-    if (maritalStatus && settlementType) {
+  const applySelection = (ms: MaritalStatus, st: SettlementType) => {
+    if (ms && st) {
       setDivergenceResult({
-        maritalStatus,
-        settlementType,
-        settlementLocation: settlementType === 'local' ? '本市户籍' : '外省市户籍',
-        applicableItems: getApplicableItems(),
-        pathName: getPathName(),
+        maritalStatus: ms,
+        settlementType: st,
+        settlementLocation: st === 'local' ? '本市户籍' : '外省市户籍',
+        applicableItems: getApplicableItems(st),
+        pathName: getPathName(ms, st),
       });
     }
-  }, [maritalStatus, settlementType]);
+  };
+
+  const handleMaritalChange = (value: MaritalStatus) => {
+    if (draft && value !== (divergenceResult?.maritalStatus || null)) {
+      setPendingSelection({ marital: value, settlement: settlementType });
+      setShowConfirmModal(true);
+      return;
+    }
+    setMaritalStatus(value);
+    applySelection(value, settlementType);
+  };
+
+  const handleSettlementChange = (value: SettlementType) => {
+    if (draft && value !== (divergenceResult?.settlementType || null)) {
+      setPendingSelection({ marital: maritalStatus, settlement: value });
+      setShowConfirmModal(true);
+      return;
+    }
+    setSettlementType(value);
+    applySelection(maritalStatus, value);
+  };
+
+  const confirmChange = () => {
+    if (pendingSelection) {
+      clearDraft();
+      setDraft(null);
+      setMaritalStatus(pendingSelection.marital);
+      setSettlementType(pendingSelection.settlement);
+      applySelection(pendingSelection.marital, pendingSelection.settlement);
+    }
+    setShowConfirmModal(false);
+    setPendingSelection(null);
+  };
+
+  const cancelChange = () => {
+    setShowConfirmModal(false);
+    setPendingSelection(null);
+  };
+
+  const handleResumeDraft = () => {
+    const loaded = loadDraft();
+    if (loaded) {
+      setMaritalStatus(loaded.divergenceResult.maritalStatus);
+      setSettlementType(loaded.divergenceResult.settlementType);
+      setDraft(loaded);
+      if (loaded.lastPage === 'apply') {
+        navigate('/apply');
+      } else {
+        navigate('/materials');
+      }
+    }
+  };
+
+  const handleClearDraft = () => {
+    clearDraft();
+    setDraft(null);
+  };
 
   const handleGoToMaterials = () => {
+    if (maritalStatus && settlementType) {
+      applySelection(maritalStatus, settlementType);
+    }
+    saveDraft();
     navigate('/materials');
   };
+
+  const displayResult = divergenceResult && maritalStatus && settlementType;
 
   return (
     <div className="min-h-screen">
@@ -225,6 +339,54 @@ export default function Home() {
           </div>
 
           <div className="max-w-4xl mx-auto">
+            {/* 草稿提示 */}
+            {draft && (
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 mb-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Save className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h5 className="font-bold text-amber-800">检测到未完成的草稿</h5>
+                      <span className="px-2 py-0.5 bg-amber-200 text-amber-800 text-xs font-medium rounded-full">
+                        {formatDraftTime(draft.updatedAt)}
+                      </span>
+                    </div>
+                    <p className="text-amber-700 text-sm mb-2">
+                      <span className="font-medium">{draft.divergenceResult.pathName}</span>
+                      {' · 停留在 '}
+                      <span className="font-medium">{stepLabels[draft.lastPage]}</span>
+                      {' · 已上传 '}
+                      <span className="font-medium">{draft.materials.filter((m) => m.uploaded).length}/{draft.materials.filter((m) => m.source !== 'notApplicable').length}</span>
+                      {' 份材料'}
+                      {draft.verifiedMother && ' · 母亲身份已核验'}
+                      {draft.verifiedFather && draft.divergenceResult.maritalStatus !== 'single' && ' · 父亲身份已核验'}
+                    </p>
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <button
+                        onClick={handleResumeDraft}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        继续办理
+                      </button>
+                      <button
+                        onClick={handleClearDraft}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-amber-700 text-sm font-medium rounded-lg transition-colors border border-amber-200"
+                      >
+                        <X className="w-4 h-4" />
+                        放弃草稿
+                      </button>
+                      <span className="text-xs text-amber-600 ml-1">
+                        切换路径会覆盖当前草稿
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
               <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-4">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -249,7 +411,7 @@ export default function Home() {
                     ].map((option) => (
                       <button
                         key={option.value}
-                        onClick={() => setMaritalStatus(option.value)}
+                        onClick={() => handleMaritalChange(option.value)}
                         className={cn(
                           'p-4 rounded-2xl border-2 text-left transition-all',
                           'hover:shadow-md',
@@ -301,7 +463,7 @@ export default function Home() {
                     ].map((option) => (
                       <button
                         key={option.value}
-                        onClick={() => setSettlementType(option.value)}
+                        onClick={() => handleSettlementChange(option.value)}
                         className={cn(
                           'p-4 rounded-2xl border-2 text-left transition-all',
                           'hover:shadow-md',
@@ -339,7 +501,7 @@ export default function Home() {
                 </div>
 
                 {/* 分流结果 */}
-                {canProceed && divergenceResult && (
+                {displayResult && divergenceResult && (
                   <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-5">
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -363,7 +525,8 @@ export default function Home() {
                           ))}
                         </div>
                         <p className="text-xs text-emerald-600 mt-3">
-                          共 {divergenceResult.applicableItems.length} 个联办事项，可随时修改上方选项重新匹配
+                          共 {divergenceResult.applicableItems.length} 个联办事项，
+                          {draft ? '当前草稿属于不同路径，继续办理将覆盖已有草稿' : '可随时修改上方选项重新匹配'}
                         </p>
                       </div>
                     </div>
@@ -384,7 +547,7 @@ export default function Home() {
                 >
                   {canProceed ? (
                     <>
-                      开始准备材料
+                      {draft ? '开始新办理（覆盖草稿）' : '开始准备材料'}
                       <ArrowRight className="w-5 h-5" />
                     </>
                   ) : (
@@ -574,6 +737,57 @@ export default function Home() {
           <HelpCircle className="w-6 h-6" />
         </button>
       </div>
+
+      {/* 确认弹窗 */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">
+                    切换路径将覆盖草稿
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    您当前有一份未完成的办理草稿，切换办理路径后，已上传的材料和核验进度将被清除，是否继续？
+                  </p>
+                  {pendingSelection && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
+                      <p className="text-gray-500 mb-1">新路径预览：</p>
+                      <p className="font-medium text-gray-900">
+                        {getPathName(pendingSelection.marital, pendingSelection.settlement)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        联办事项：
+                        {pendingSelection.settlement
+                          ? getApplicableItems(pendingSelection.settlement).join('、')
+                          : '待选择'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={cancelChange}
+                className="flex-1 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                保留草稿
+              </button>
+              <button
+                onClick={confirmChange}
+                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors"
+              >
+                确认切换并覆盖
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
