@@ -23,6 +23,8 @@ import {
   X,
   ChevronDown,
   Building,
+  Filter,
+  XCircle as XCircleIcon,
 } from 'lucide-react';
 import { cn, getStatusText, getStatusColor, formatDate, formatDateTime, flowRecordIconMap, flowRecordColorMap } from '@/utils/helpers';
 import { useProgressStore } from '@/store/progress';
@@ -61,6 +63,9 @@ export default function Progress() {
   const [uploadingCorrection, setUploadingCorrection] = useState<string | null>(null);
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
+  const [selectedDepartments, setSelectedDepartments] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const completedCount = applicationItems.filter((item) => item.status === 'completed').length;
   const processingCount = applicationItems.filter((item) => item.status === 'processing').length;
@@ -70,12 +75,22 @@ export default function Progress() {
 
   const unresolvedCorrections = corrections.filter((c) => !c.resolved);
 
+  // 所有部门列表
+  const allDepartments = Array.from(new Set(applicationItems.map((item) => item.department)));
+
   const filteredItems = applicationItems.filter((item) => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return item.status !== 'completed';
-    if (activeTab === 'completed') return item.status === 'completed';
+    // 状态筛选（顶部 tab）
+    if (activeTab === 'pending' && item.status === 'completed') return false;
+    if (activeTab === 'completed' && item.status !== 'completed') return false;
+
+    // 部门筛选
+    if (selectedDepartments.size > 0 && !selectedDepartments.has(item.department)) return false;
+
+    // 状态细分筛选
+    if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+
     return true;
-  });
+  }).sort((a, b) => a.order - b.order);
 
   const handleStartCorrection = (correctionId: string) => {
     setActiveCorrectionId(correctionId);
@@ -105,6 +120,24 @@ export default function Progress() {
       }
       return next;
     });
+  };
+
+  const toggleDepartment = (dept: string) => {
+    setSelectedDepartments((prev) => {
+      const next = new Set(prev);
+      if (next.has(dept)) {
+        next.delete(dept);
+      } else {
+        next.add(dept);
+      }
+      return next;
+    });
+  };
+
+  const clearAllFilters = () => {
+    setSelectedDepartments(new Set());
+    setStatusFilter('all');
+    setActiveTab('all');
   };
 
   return (
@@ -307,11 +340,104 @@ export default function Progress() {
 
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Clock className="w-5 h-5 text-blue-500" />
                   事项办理进度
                 </h2>
+                <div className="flex items-center gap-2">
+                  {(selectedDepartments.size > 0 || statusFilter !== 'all') && (
+                    <button
+                      onClick={clearAllFilters}
+                      className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      清除筛选
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowFilterPanel(!showFilterPanel)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
+                      showFilterPanel || selectedDepartments.size > 0 || statusFilter !== 'all'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    )}
+                  >
+                    <Filter className="w-4 h-4" />
+                    筛选
+                    {(selectedDepartments.size > 0 || statusFilter !== 'all') && (
+                      <span className="bg-blue-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                        {selectedDepartments.size + (statusFilter !== 'all' ? 1 : 0)}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* 筛选面板 */}
+              {showFilterPanel && (
+                <div className="bg-gray-50 rounded-xl p-4 mb-4 space-y-4 border border-gray-200">
+                  {/* 按部门筛选 */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                      <Building className="w-4 h-4" />
+                      按部门筛选
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {allDepartments.map((dept) => (
+                        <button
+                          key={dept}
+                          onClick={() => toggleDepartment(dept)}
+                          className={cn(
+                            'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+                            selectedDepartments.has(dept)
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                          )}
+                        >
+                          {dept}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 按状态筛选 */}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                      <XCircle className="w-4 h-4" />
+                      按状态筛选
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: 'all', label: '全部状态' },
+                        { value: 'pending', label: '待办理' },
+                        { value: 'processing', label: '办理中' },
+                        { value: 'rejected', label: '待补正' },
+                        { value: 'completed', label: '已完成' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setStatusFilter(opt.value)}
+                          className={cn(
+                            'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+                            statusFilter === opt.value
+                              ? 'bg-blue-500 text-white'
+                              : 'bg-white text-gray-600 border border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500">
+                  共 <span className="font-medium text-gray-900">{filteredItems.length}</span> 个事项
+                </div>
                 <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
                   {[
                     { key: 'all', label: '全部' },

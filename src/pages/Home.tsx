@@ -25,8 +25,13 @@ import {
   FileText,
   Save,
   AlertTriangle,
+  AlertCircle,
   X,
   RefreshCw,
+  CheckCircle2,
+  Circle,
+  User,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/utils/helpers';
 import { useApplicationStore } from '@/store/application';
@@ -118,6 +123,7 @@ export default function Home() {
     marital: MaritalStatus;
     settlement: SettlementType;
   } | null>(null);
+  const [confirmMode, setConfirmMode] = useState<'switch' | 'start'>('switch');
 
   // 页面加载时读取草稿信息
   useEffect(() => {
@@ -165,6 +171,7 @@ export default function Home() {
   const handleMaritalChange = (value: MaritalStatus) => {
     if (draft && value !== (divergenceResult?.maritalStatus || null)) {
       setPendingSelection({ marital: value, settlement: settlementType });
+      setConfirmMode('switch');
       setShowConfirmModal(true);
       return;
     }
@@ -175,6 +182,7 @@ export default function Home() {
   const handleSettlementChange = (value: SettlementType) => {
     if (draft && value !== (divergenceResult?.settlementType || null)) {
       setPendingSelection({ marital: maritalStatus, settlement: value });
+      setConfirmMode('switch');
       setShowConfirmModal(true);
       return;
     }
@@ -189,14 +197,23 @@ export default function Home() {
       setMaritalStatus(pendingSelection.marital);
       setSettlementType(pendingSelection.settlement);
       applySelection(pendingSelection.marital, pendingSelection.settlement);
+
+      if (confirmMode === 'start' && pendingSelection.marital && pendingSelection.settlement) {
+        setTimeout(() => {
+          saveDraft();
+          navigate('/materials');
+        }, 0);
+      }
     }
     setShowConfirmModal(false);
     setPendingSelection(null);
+    setConfirmMode('switch');
   };
 
   const cancelChange = () => {
     setShowConfirmModal(false);
     setPendingSelection(null);
+    setConfirmMode('switch');
   };
 
   const handleResumeDraft = () => {
@@ -222,6 +239,18 @@ export default function Home() {
     if (maritalStatus && settlementType) {
       applySelection(maritalStatus, settlementType);
     }
+
+    if (draft && maritalStatus && settlementType) {
+      const newPath = getPathName(maritalStatus, settlementType);
+      const oldPath = draft.divergenceResult.pathName;
+      if (newPath !== oldPath || draft.divergenceResult.maritalStatus !== maritalStatus || draft.divergenceResult.settlementType !== settlementType) {
+        setPendingSelection({ marital: maritalStatus, settlement: settlementType });
+        setConfirmMode('start');
+        setShowConfirmModal(true);
+        return;
+      }
+    }
+
     saveDraft();
     navigate('/materials');
   };
@@ -342,7 +371,7 @@ export default function Home() {
             {/* 草稿提示 */}
             {draft && (
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 mb-6">
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 mb-4">
                   <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Save className="w-5 h-5 text-white" />
                   </div>
@@ -353,36 +382,216 @@ export default function Home() {
                         {formatDraftTime(draft.updatedAt)}
                       </span>
                     </div>
-                    <p className="text-amber-700 text-sm mb-2">
+                    <p className="text-amber-700 text-sm">
                       <span className="font-medium">{draft.divergenceResult.pathName}</span>
                       {' · 停留在 '}
                       <span className="font-medium">{stepLabels[draft.lastPage]}</span>
-                      {' · 已上传 '}
-                      <span className="font-medium">{draft.materials.filter((m) => m.uploaded).length}/{draft.materials.filter((m) => m.source !== 'notApplicable').length}</span>
-                      {' 份材料'}
-                      {draft.verifiedMother && ' · 母亲身份已核验'}
-                      {draft.verifiedFather && draft.divergenceResult.maritalStatus !== 'single' && ' · 父亲身份已核验'}
                     </p>
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      <button
-                        onClick={handleResumeDraft}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        继续办理
-                      </button>
-                      <button
-                        onClick={handleClearDraft}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-amber-700 text-sm font-medium rounded-lg transition-colors border border-amber-200"
-                      >
-                        <X className="w-4 h-4" />
-                        放弃草稿
-                      </button>
-                      <span className="text-xs text-amber-600 ml-1">
-                        切换路径会覆盖当前草稿
+                  </div>
+                </div>
+
+                {/* 步骤进度卡片 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                  {/* 材料准备 */}
+                  <div className="bg-white rounded-xl p-4 border border-amber-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
+                        draft.lastPage === 'materials' ? 'bg-amber-500' : 'bg-amber-100'
+                      )}>
+                        <ClipboardList className={cn(
+                          'w-4 h-4',
+                          draft.lastPage === 'materials' ? 'text-white' : 'text-amber-600'
+                        )} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">材料准备</p>
+                        <p className="text-xs text-gray-500">3 个步骤</p>
+                      </div>
+                      {draft.lastPage !== 'materials' && draft.lastPage === 'apply' && (
+                        <CheckCircle2 className="w-4 h-4 text-green-500 ml-auto" />
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      {['条件自检', '材料清单', '材料上传'].map((label, idx) => {
+                        const done = draft.materialsStep > idx;
+                        const current = draft.lastPage === 'materials' && draft.materialsStep === idx;
+                        return (
+                          <div key={label} className="flex items-center gap-2">
+                            {done ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            ) : current ? (
+                              <div className="w-3.5 h-3.5 rounded-full bg-amber-500 flex-shrink-0 ring-2 ring-amber-200" />
+                            ) : (
+                              <Circle className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                            )}
+                            <span className={cn(
+                              'text-xs',
+                              done ? 'text-gray-600' : current ? 'text-amber-700 font-medium' : 'text-gray-400'
+                            )}>
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-amber-50 flex items-center justify-between text-xs">
+                      <span className="text-gray-500">
+                        已上传 {draft.materials.filter((m) => m.uploaded).length}/{draft.materials.filter((m) => m.source !== 'notApplicable').length} 份
+                      </span>
+                      <span className="text-amber-600 font-medium">
+                        {Math.round((draft.materialsStep / 3) * 100)}%
                       </span>
                     </div>
                   </div>
+
+                  {/* 身份核验 */}
+                  <div className="bg-white rounded-xl p-4 border border-amber-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
+                        draft.lastPage === 'apply' && draft.applyStep >= 2 ? 'bg-green-500' : 'bg-amber-100'
+                      )}>
+                        <ShieldCheck className={cn(
+                          'w-4 h-4',
+                          draft.lastPage === 'apply' && draft.applyStep >= 2 ? 'text-white' : 'text-amber-600'
+                        )} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">身份核验</p>
+                        <p className="text-xs text-gray-500">
+                          {draft.divergenceResult.maritalStatus === 'single' ? '单亲 · 1 人' : '双亲 · 2 人'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {(() => {
+                        const isSingle = draft.divergenceResult.maritalStatus === 'single';
+                        const motherDone = draft.verifiedMother;
+                        const fatherDone = draft.verifiedFather;
+                        return (
+                          <>
+                            <div className="flex items-center gap-2">
+                              {motherDone ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                              ) : (
+                                <Circle className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                              )}
+                              <span className={cn(
+                                'text-xs',
+                                motherDone ? 'text-gray-600' : 'text-gray-400'
+                              )}>
+                                母亲 {isSingle && '（监护人）'}
+                              </span>
+                            </div>
+                            {!isSingle && (
+                              <div className="flex items-center gap-2">
+                                {fatherDone ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                                ) : (
+                                  <Circle className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                                )}
+                                <span className={cn(
+                                  'text-xs',
+                                  fatherDone ? 'text-gray-600' : 'text-gray-400'
+                                )}>
+                                  父亲
+                                </span>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-amber-50 flex items-center justify-between text-xs">
+                      <span className="text-gray-500">
+                        {(() => {
+                          const isSingle = draft.divergenceResult.maritalStatus === 'single';
+                          const total = isSingle ? 1 : 2;
+                          const done = (draft.verifiedMother ? 1 : 0) + (draft.verifiedFather && !isSingle ? 1 : 0);
+                          return `已完成 ${done}/${total}`;
+                        })()}
+                      </span>
+                      <span className="text-amber-600 font-medium">
+                        {(() => {
+                          const isSingle = draft.divergenceResult.maritalStatus === 'single';
+                          const total = isSingle ? 1 : 2;
+                          const done = (draft.verifiedMother ? 1 : 0) + (draft.verifiedFather && !isSingle ? 1 : 0);
+                          return `${Math.round((done / total) * 100)}%`;
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 提交前核对 */}
+                  <div className="bg-white rounded-xl p-4 border border-amber-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={cn(
+                        'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0',
+                        draft.lastPage === 'apply' && draft.applyStep >= 3 ? 'bg-green-500' : 'bg-gray-100'
+                      )}>
+                        <FileCheck className={cn(
+                          'w-4 h-4',
+                          draft.lastPage === 'apply' && draft.applyStep >= 3 ? 'text-white' : 'text-gray-400'
+                        )} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">提交申报</p>
+                        <p className="text-xs text-gray-500">4 个步骤</p>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      {['事项确认', '信息校对', '身份核验', '提交核对'].map((label, idx) => {
+                        const done = draft.applyStep > idx;
+                        const current = draft.lastPage === 'apply' && draft.applyStep === idx;
+                        return (
+                          <div key={label} className="flex items-center gap-2">
+                            {done ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                            ) : current ? (
+                              <div className="w-3.5 h-3.5 rounded-full bg-amber-500 flex-shrink-0 ring-2 ring-amber-200" />
+                            ) : (
+                              <Circle className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                            )}
+                            <span className={cn(
+                              'text-xs',
+                              done ? 'text-gray-600' : current ? 'text-amber-700 font-medium' : 'text-gray-400'
+                            )}>
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-amber-50 flex items-center justify-between text-xs">
+                      <span className="text-gray-500">
+                        共 {draft.divergenceResult.applicableItems.length} 项联办
+                      </span>
+                      <span className="text-amber-600 font-medium">
+                        {Math.round((draft.applyStep / 4) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handleResumeDraft}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    继续办理
+                  </button>
+                  <button
+                    onClick={handleClearDraft}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-gray-50 text-amber-700 text-sm font-medium rounded-lg transition-colors border border-amber-200"
+                  >
+                    <X className="w-4 h-4" />
+                    放弃草稿
+                  </button>
+                  <span className="text-xs text-amber-600 ml-1">
+                    切换路径会覆盖当前草稿
+                  </span>
                 </div>
               </div>
             )}
@@ -741,33 +950,120 @@ export default function Home() {
       {/* 确认弹窗 */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
             <div className="p-6">
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-4 mb-5">
                 <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
                   <AlertTriangle className="w-6 h-6 text-amber-600" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-gray-900 mb-1">
-                    切换路径将覆盖草稿
+                    {confirmMode === 'start' ? '开始新办理将覆盖草稿' : '切换路径将覆盖草稿'}
                   </h3>
                   <p className="text-sm text-gray-600">
-                    您当前有一份未完成的办理草稿，切换办理路径后，已上传的材料和核验进度将被清除，是否继续？
+                    您当前有一份未完成的办理草稿，{confirmMode === 'start' ? '开始新办理' : '切换办理路径'}后，已有的办理进度将被清除，是否继续？
+                  </p>
+                </div>
+              </div>
+
+              {/* 新旧路径对比 */}
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                {/* 当前草稿 */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                    <Save className="w-3.5 h-3.5" />
+                    当前草稿
+                  </p>
+                  {draft && (
+                    <>
+                      <p className="text-sm font-semibold text-gray-900 mb-2">
+                        {draft.divergenceResult.pathName}
+                      </p>
+                      <div className="space-y-1 text-xs text-gray-600">
+                        <div className="flex justify-between">
+                          <span>材料准备</span>
+                          <span className="font-medium">{Math.round((draft.materialsStep / 3) * 100)}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>身份核验</span>
+                          <span className="font-medium">
+                            {(() => {
+                              const isSingle = draft.divergenceResult.maritalStatus === 'single';
+                              const total = isSingle ? 1 : 2;
+                              const done = (draft.verifiedMother ? 1 : 0) + (draft.verifiedFather && !isSingle ? 1 : 0);
+                              return `${done}/${total}`;
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>提交步骤</span>
+                          <span className="font-medium">第 {draft.applyStep + 1} / 4 步</span>
+                        </div>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-gray-200">
+                        <p className="text-xs text-gray-500">
+                          更新于 {formatDraftTime(draft.updatedAt)}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* 新路径 */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <p className="text-xs text-blue-600 mb-2 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {confirmMode === 'start' ? '新办理路径' : '切换后路径'}
                   </p>
                   {pendingSelection && (
-                    <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm">
-                      <p className="text-gray-500 mb-1">新路径预览：</p>
-                      <p className="font-medium text-gray-900">
+                    <>
+                      <p className="text-sm font-semibold text-blue-900 mb-2">
                         {getPathName(pendingSelection.marital, pendingSelection.settlement)}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        联办事项：
-                        {pendingSelection.settlement
-                          ? getApplicableItems(pendingSelection.settlement).join('、')
-                          : '待选择'}
-                      </p>
-                    </div>
+                      <div className="space-y-1 text-xs text-blue-700">
+                        <div className="flex justify-between">
+                          <span>联办事项</span>
+                          <span className="font-medium">
+                            {pendingSelection.settlement
+                              ? getApplicableItems(pendingSelection.settlement).length
+                              : '-'} 项
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>婚姻状态</span>
+                          <span className="font-medium">
+                            {pendingSelection.marital === 'married' ? '已婚' : pendingSelection.marital === 'single' ? '单亲' : '-'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>落户类型</span>
+                          <span className="font-medium">
+                            {pendingSelection.settlement === 'local' ? '本市' : '外省市'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-blue-200">
+                        <p className="text-xs text-blue-600">
+                          将从头开始办理
+                        </p>
+                      </div>
+                    </>
                   )}
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-5">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-red-700">
+                    <p className="font-semibold mb-1">确认后将清除</p>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      <li>已上传的所有材料</li>
+                      <li>身份核验状态</li>
+                      <li>已填写的信息修改</li>
+                      <li>当前办理步骤进度</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -780,9 +1076,14 @@ export default function Home() {
               </button>
               <button
                 onClick={confirmChange}
-                className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors"
+                className={cn(
+                  'flex-1 py-3 text-white font-medium rounded-xl transition-colors',
+                  confirmMode === 'start'
+                    ? 'bg-blue-500 hover:bg-blue-600'
+                    : 'bg-amber-500 hover:bg-amber-600'
+                )}
               >
-                确认切换并覆盖
+                {confirmMode === 'start' ? '确认开始新办理' : '确认切换并覆盖'}
               </button>
             </div>
           </div>

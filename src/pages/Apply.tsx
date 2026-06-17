@@ -134,7 +134,7 @@ export default function Apply() {
     setSubmitting(true);
     setTimeout(() => {
       setApplicationSubmitted(true);
-      navigate('/progress');
+      navigate('/receipt');
     }, 2000);
   };
 

@@ -5,6 +5,7 @@ import Materials from '@/pages/Materials';
 import Apply from '@/pages/Apply';
 import Progress from '@/pages/Progress';
 import Result from '@/pages/Result';
+import Receipt from '@/pages/Receipt';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/apply" element={<Apply />} />
           <Route path="/progress" element={<Progress />} />
           <Route path="/result" element={<Result />} />
+          <Route path="/receipt" element={<Receipt />} />
         </Routes>
       </Layout>
     </Router>
